@@ -172,7 +172,7 @@ export async function initPushNotifications(onNavigate?: NavigationHandler): Pro
           if (orderId) {
             navigateSafely(`/orders?orderId=${encodeURIComponent(orderId)}`, orderId);
           } else if (url) {
-            const path = url.replace(/^buildnow:\/\//, '/');
+            const path = url.replace(/^(smartrun|buildnow):\/\//, '/');
             navigateSafely(path);
           } else {
             navigateSafely('/orders');

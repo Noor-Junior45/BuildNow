@@ -90,7 +90,7 @@ export function prewarmImageCache(imageUrls: string[]) {
     }
 
     caches
-      .open('buildnow-images-v2.1.0')
+      .open('smartrun-images-v2.3.0')
       .then(async (cache) => {
         for (const url of validUrls.slice(0, 20)) {
           const isCached = await cache.match(url);

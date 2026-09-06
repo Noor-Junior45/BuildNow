@@ -208,7 +208,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onAuthSuccess }) => {
     try {
       const isNative = typeof window !== 'undefined' && Capacitor.isNativePlatform();
       const redirectTo = isNative
-        ? 'buildnow://reset-password'
+        ? 'smartrun://reset-password'
         : `${window.location.origin}/reset-password`;
 
       const { error: resetError } = await supabase.auth.resetPasswordForEmail(cleanEmail, {
@@ -243,7 +243,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onAuthSuccess }) => {
     setIsMagicLoading(true);
     try {
       const isNative = typeof window !== 'undefined' && Capacitor.isNativePlatform();
-      const redirectTo = isNative ? 'buildnow://login' : window.location.origin;
+      const redirectTo = isNative ? 'smartrun://login' : window.location.origin;
 
       const { error: magicError } = await supabase.auth.signInWithOtp({
         email: cleanEmail,
@@ -275,13 +275,12 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onAuthSuccess }) => {
         
         {/* Brand Logo & Name Header */}
         <div className="flex flex-col items-center justify-center text-center space-y-2">
-          <div className="relative">
+          <div>
             <img
-              src="/buildnow.png"
+              src="/smartrun.jpeg"
               alt="SmartRun Logo"
-              className="w-16 h-16 object-contain rounded-2xl shadow-sm border border-slate-100 p-1 bg-white"
+              className="w-16 h-16 object-cover rounded-2xl shadow-sm border border-slate-100 p-0.5 bg-white"
             />
-            <span className="absolute -bottom-1 -right-1 w-4 h-4 bg-emerald-500 rounded-full border-2 border-white flex items-center justify-center" />
           </div>
 
           <div>

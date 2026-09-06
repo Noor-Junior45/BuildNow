@@ -506,9 +506,11 @@ export default function App() {
 
         // Check if OAuth callback with tokens or auth code
         if (urlStr.includes('#access_token') || urlStr.includes('?access_token') || urlStr.includes('code=') || urlStr.includes('error_description')) {
-          // Normalize URL for parsing
-          const normalizedUrl = urlStr.startsWith('buildnow://')
-            ? urlStr.replace('buildnow://', 'https://buildnow.app/')
+          // Normalize URL for parsing (support smartrun:// and legacy buildnow://)
+          const normalizedUrl = urlStr.startsWith('smartrun://')
+            ? urlStr.replace('smartrun://', 'https://smartrun.in/')
+            : urlStr.startsWith('buildnow://')
+            ? urlStr.replace('buildnow://', 'https://smartrun.in/')
             : urlStr;
 
           try {
@@ -589,7 +591,10 @@ export default function App() {
         }
 
         let path = '';
-        if (urlStr.startsWith('buildnow://')) {
+        if (urlStr.startsWith('smartrun://')) {
+          const raw = urlStr.replace('smartrun://', '');
+          path = raw.startsWith('/') ? raw : `/${raw}`;
+        } else if (urlStr.startsWith('buildnow://')) {
           const raw = urlStr.replace('buildnow://', '');
           path = raw.startsWith('/') ? raw : `/${raw}`;
         } else {
@@ -1041,9 +1046,9 @@ export default function App() {
         <SEOHead />
         <div className="flex flex-col items-center space-y-3 animate-pulse">
           <img
-            src="/buildnow.png"
+            src="/smartrun.jpeg"
             alt="SmartRun Logo"
-            className="w-16 h-16 object-contain rounded-2xl shadow-sm border border-slate-200 bg-white p-1"
+            className="w-16 h-16 object-cover rounded-2xl shadow-sm border border-slate-200 bg-white p-0.5"
           />
           <div className="text-3xl font-bold font-bodoni flex items-center justify-center">
             <span className="text-slate-950">Smart</span>

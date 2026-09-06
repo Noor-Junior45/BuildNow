@@ -151,9 +151,19 @@ export const Footer: React.FC<FooterProps> = () => {
 
         </div>
 
-        {/* Bottom Bar: Copyright */}
-        <div className="pt-6 flex items-center justify-between gap-3 text-slate-500 text-[11px]">
-          <p>© {new Date().getFullYear()} SmartRun. All rights reserved.</p>
+        {/* Bottom Bar: Brand & Copyright */}
+        <div className="pt-6 flex flex-wrap items-center justify-between gap-3 text-slate-400 text-[11px]">
+          <div className="flex items-center gap-2">
+            <img
+              src="/smartrun.jpeg"
+              alt="SmartRun"
+              className="w-5 h-5 rounded-full object-cover border border-slate-700"
+            />
+            <span className="font-bold text-white tracking-wide">SmartRun</span>
+            <span className="text-slate-600">|</span>
+            <span>Kolkata Electrical &amp; Construction Supplies</span>
+          </div>
+          <p className="text-slate-500">© {new Date().getFullYear()} SmartRun. All rights reserved.</p>
         </div>
 
       </div>

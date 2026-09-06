@@ -376,7 +376,7 @@ export async function resetPasswordForEmail(
   try {
     const isNative = typeof window !== 'undefined' && Capacitor.isNativePlatform();
     const redirectTo = isNative
-      ? 'buildnow://reset-password'
+      ? 'smartrun://reset-password'
       : (typeof window !== 'undefined' ? window.location.origin : undefined);
     const { error } = await supabase.auth.resetPasswordForEmail(email.trim().toLowerCase(), {
       redirectTo
@@ -402,7 +402,7 @@ export async function signInWithGoogle(): Promise<{ error: Error | null; url?: s
     
     // In native Android APK, use custom app scheme or web origin for Supabase OAuth callback
     const redirectTo = isNative
-      ? 'buildnow://login'
+      ? 'smartrun://login'
       : (typeof window !== 'undefined' ? window.location.origin : undefined);
 
     const { data, error } = await supabase.auth.signInWithOAuth({
