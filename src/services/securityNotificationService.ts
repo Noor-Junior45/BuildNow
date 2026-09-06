@@ -71,9 +71,9 @@ export function getClientDeviceInfo(): ClientDeviceInfo {
   let browserName = 'Browser';
   let isApp = false;
 
-  if (ua.includes('BuildNow') || ua.includes('TWA') || ua.includes('AndroidApp') || isStandalone) {
+  if (ua.includes('Smartrun') || ua.includes('BuildNow') || ua.includes('TWA') || ua.includes('AndroidApp') || isStandalone) {
     isApp = true;
-    browserName = /android/i.test(ua) ? 'BuildNow Android App (TWA)' : 'BuildNow App (Standalone)';
+    browserName = /android/i.test(ua) ? 'Smartrun Android App' : 'Smartrun App (Standalone)';
   } else if (/Edg\//i.test(ua)) {
     const match = ua.match(/Edg\/([0-9\.]+)/i);
     browserName = match ? `Microsoft Edge ${match[1].split('.')[0]}` : 'Microsoft Edge';
@@ -95,7 +95,7 @@ export function getClientDeviceInfo(): ClientDeviceInfo {
   if (/tablet|ipad/i.test(ua) || (navigator.maxTouchPoints > 1 && /macintosh/i.test(ua))) {
     deviceType = 'Tablet';
   } else if (/mobile|iphone|ipod|android.*mobile/i.test(ua)) {
-    deviceType = isApp ? 'Android Smartphone (BuildNow App)' : 'Mobile Device';
+    deviceType = isApp ? 'Android Smartphone (Smartrun App)' : 'Mobile Device';
   }
 
   let screenResolution = `${window.screen?.width || 0}x${window.screen?.height || 0}`;

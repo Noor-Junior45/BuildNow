@@ -57,7 +57,7 @@ export function registerServiceWorker() {
           if (installingWorker) {
             installingWorker.addEventListener('statechange', () => {
               if (installingWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                console.log('[SW] New version available for BuildNow');
+                console.log('[SW] New version available for Smartrun');
               }
             });
           }

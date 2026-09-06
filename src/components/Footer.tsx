@@ -127,7 +127,7 @@ export const Footer: React.FC<FooterProps> = () => {
               <div className="flex items-start gap-2.5">
                 <MapPin className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
                 <div>
-                  <p className="font-bold text-white">BuildNow Central Store &amp; Depot</p>
+                  <p className="font-bold text-white">Smartrun Central Store &amp; Depot</p>
                   <p className="text-[11px] text-slate-400 leading-relaxed mt-0.5">
                     Bediadanga 1st Ln, Nator Park, Kasba, Kolkata, West Bengal 700039, India
                   </p>
@@ -153,7 +153,7 @@ export const Footer: React.FC<FooterProps> = () => {
 
         {/* Bottom Bar: Copyright */}
         <div className="pt-6 flex items-center justify-between gap-3 text-slate-500 text-[11px]">
-          <p>© {new Date().getFullYear()} BuildNow. All rights reserved.</p>
+          <p>© {new Date().getFullYear()} Smartrun. All rights reserved.</p>
         </div>
 
       </div>

@@ -64,7 +64,7 @@ export const LegalView: React.FC<LegalViewProps> = ({ onBack, type }) => {
       case 'privacy':
         return {
           title: 'Privacy Policy',
-          subtitle: 'How BuildNow protects, secures, and handles your account and order information',
+          subtitle: 'How Smartrun protects, secures, and handles your account and order information',
           icon: Lock,
           badge: ''
         };
@@ -121,7 +121,7 @@ export const LegalView: React.FC<LegalViewProps> = ({ onBack, type }) => {
                 {meta.title}
               </h2>
               <p className="text-xs text-emerald-100">
-                BuildNow (https://www.girirajpower.in) • Effective Date: {effectiveDate}
+                Smartrun (https://www.girirajpower.in) • Effective Date: {effectiveDate}
               </p>
             </div>
           </div>
@@ -144,7 +144,7 @@ export const LegalView: React.FC<LegalViewProps> = ({ onBack, type }) => {
                   Who We Are
                 </h3>
                 <p>
-                  <strong>BuildNow</strong> (operating at <em>https://www.girirajpower.in</em>) is Kolkata’s premier electrical goods depot, e-commerce marketplace, and licensed electrical contractor service platform. Headquartered at our central Kasba depot, we supply retail homeowners, commercial builders, architects, and electrical engineers with 100% genuine factory-certified materials.
+                  <strong>Smartrun</strong> (operating at <em>https://www.girirajpower.in</em>) is Kolkata’s premier electrical goods depot, e-commerce marketplace, and licensed electrical contractor service platform. Headquartered at our central Kasba depot, we supply retail homeowners, commercial builders, architects, and electrical engineers with 100% genuine factory-certified materials.
                 </p>
               </section>
 
@@ -196,9 +196,9 @@ export const LegalView: React.FC<LegalViewProps> = ({ onBack, type }) => {
                 
                 <div className="space-y-3">
                   <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-1">
-                    <p className="font-bold text-slate-900 text-xs">Q: What is BuildNow?</p>
+                    <p className="font-bold text-slate-900 text-xs">Q: What is Smartrun?</p>
                     <p className="text-slate-600 text-xs">
-                      BuildNow is an e-commerce platform and wholesale distributor in Kolkata offering genuine electrical goods, construction materials, and certified electrician wiring services.
+                      Smartrun is an e-commerce platform and wholesale distributor in Kolkata offering genuine electrical goods, construction materials, and certified electrician wiring services.
                     </p>
                   </div>
 
@@ -238,7 +238,7 @@ export const LegalView: React.FC<LegalViewProps> = ({ onBack, type }) => {
                   1. 7-Day Return &amp; Replacement Condition
                 </h3>
                 <p>
-                  At BuildNow, customer satisfaction is our top priority. We accept returns or replacement requests within <strong>7 days from the date of delivery</strong>, subject to the following conditions:
+                  At Smartrun, customer satisfaction is our top priority. We accept returns or replacement requests within <strong>7 days from the date of delivery</strong>, subject to the following conditions:
                 </p>
                 <ul className="list-disc pl-5 space-y-1.5 text-slate-600">
                   <li><strong>Product Condition:</strong> The product must be completely intact, unused, uninstalled, and free from cuts, scratches, or moisture exposure.</li>
@@ -255,7 +255,7 @@ export const LegalView: React.FC<LegalViewProps> = ({ onBack, type }) => {
                 </h3>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
                   <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200">
-                    <p className="font-black text-slate-900">⚡ Instant BuildNow Wallet Credit</p>
+                    <p className="font-black text-slate-900">⚡ Instant Smartrun Wallet Credit</p>
                     <p className="text-[11px] text-slate-600 mt-0.5">
                       Credited immediately upon successful warehouse verification with zero deductions.
                     </p>
@@ -311,10 +311,10 @@ export const LegalView: React.FC<LegalViewProps> = ({ onBack, type }) => {
               <div className="p-4 rounded-xl bg-emerald-50/80 border border-emerald-200/90 space-y-1">
                 <p className="font-bold text-emerald-950 text-xs flex items-center gap-1.5">
                   <ShieldCheck className="w-4 h-4 text-emerald-600" />
-                  <span>Privacy Policy for BuildNow (https://www.girirajpower.in)</span>
+                  <span>Privacy Policy for Smartrun (https://www.girirajpower.in)</span>
                 </p>
                 <p className="text-[11px] text-emerald-900/90 leading-relaxed">
-                  This Privacy Policy explains how <strong>BuildNow</strong> (&quot;we&quot;, &quot;us&quot;, or &quot;our&quot;) collects, uses, protects, and discloses personal information when you use our website, web application, and related services at <strong>https://www.girirajpower.in</strong>.
+                  This Privacy Policy explains how <strong>Smartrun</strong> (&quot;we&quot;, &quot;us&quot;, or &quot;our&quot;) collects, uses, protects, and discloses personal information when you use our website, web application, and related services at <strong>https://www.girirajpower.in</strong>.
                 </p>
               </div>
 
@@ -325,7 +325,7 @@ export const LegalView: React.FC<LegalViewProps> = ({ onBack, type }) => {
                   1. Purpose of the Application
                 </h3>
                 <p>
-                  BuildNow is an e-commerce platform and service marketplace dedicated to providing:
+                  Smartrun is an e-commerce platform and service marketplace dedicated to providing:
                 </p>
                 <ul className="list-disc pl-5 space-y-1 text-slate-600">
                   <li>Wholesale and retail ordering of certified electrical cables, modular switches, lighting fixtures, and construction raw materials.</li>
@@ -368,7 +368,7 @@ export const LegalView: React.FC<LegalViewProps> = ({ onBack, type }) => {
                   <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 space-y-1">
                     <p className="font-bold text-slate-900 text-xs">D. Transaction &amp; Payment Data</p>
                     <p className="text-slate-600 text-xs leading-relaxed">
-                      We record ordered product SKUs, total amounts, GST identification numbers (if provided for business claims), and payment status. All online payments are securely processed through encrypted, RBI-authorized third-party payment gateways. BuildNow does not store your credit card numbers, CVV, or banking PINs.
+                      We record ordered product SKUs, total amounts, GST identification numbers (if provided for business claims), and payment status. All online payments are securely processed through encrypted, RBI-authorized third-party payment gateways. Smartrun does not store your credit card numbers, CVV, or banking PINs.
                     </p>
                   </div>
                 </div>
@@ -385,7 +385,7 @@ export const LegalView: React.FC<LegalViewProps> = ({ onBack, type }) => {
                     Limited Use Disclosure:
                   </p>
                   <p className="text-[11px] text-sky-900 leading-relaxed">
-                    BuildNow&apos;s use and transfer to any other app of information received from Google APIs will adhere to the{' '}
+                    Smartrun&apos;s use and transfer to any other app of information received from Google APIs will adhere to the{' '}
                     <a
                       href="https://developers.google.com/terms/api-services-user-data-policy"
                       target="_blank"
@@ -470,10 +470,10 @@ export const LegalView: React.FC<LegalViewProps> = ({ onBack, type }) => {
               <div className="p-4 rounded-xl bg-emerald-50/80 border border-emerald-200/90 space-y-1">
                 <p className="font-bold text-emerald-950 text-xs flex items-center gap-1.5">
                   <FileText className="w-4 h-4 text-[#00875a]" />
-                  <span>Terms of Service for BuildNow (https://www.girirajpower.in)</span>
+                  <span>Terms of Service for Smartrun (https://www.girirajpower.in)</span>
                 </p>
                 <p className="text-[11px] text-emerald-900/90 leading-relaxed">
-                  These Terms of Service govern your access to and use of the BuildNow e-commerce platform, website, and electrical technician services located at <strong>https://www.girirajpower.in</strong>.
+                  These Terms of Service govern your access to and use of the Smartrun e-commerce platform, website, and electrical technician services located at <strong>https://www.girirajpower.in</strong>.
                 </p>
               </div>
 
@@ -483,7 +483,7 @@ export const LegalView: React.FC<LegalViewProps> = ({ onBack, type }) => {
                   1. Acceptance of Agreement
                 </h3>
                 <p>
-                  By creating an account, signing in with Google, browsing our catalog, or placing orders on BuildNow, you acknowledge that you have read, understood, and agreed to be bound by these Terms of Service, our Privacy Policy, and our Refund Policy.
+                  By creating an account, signing in with Google, browsing our catalog, or placing orders on Smartrun, you acknowledge that you have read, understood, and agreed to be bound by these Terms of Service, our Privacy Policy, and our Refund Policy.
                 </p>
               </section>
 
@@ -493,7 +493,7 @@ export const LegalView: React.FC<LegalViewProps> = ({ onBack, type }) => {
                   2. Product Authenticity &amp; Pricing
                 </h3>
                 <p>
-                  All electrical products (wires, cables, MCBs, switchboards, lighting) and construction supplies (cement, TMT steel rebars, waterproofing materials) sold on BuildNow are 100% genuine and sourced directly from certified manufacturing plants. Prices displayed are inclusive of applicable GST unless explicitly stated otherwise for wholesale bulk contractor quotes.
+                  All electrical products (wires, cables, MCBs, switchboards, lighting) and construction supplies (cement, TMT steel rebars, waterproofing materials) sold on Smartrun are 100% genuine and sourced directly from certified manufacturing plants. Prices displayed are inclusive of applicable GST unless explicitly stated otherwise for wholesale bulk contractor quotes.
                 </p>
               </section>
 
@@ -523,7 +523,7 @@ export const LegalView: React.FC<LegalViewProps> = ({ onBack, type }) => {
                   5. Licensed Electrician Services
                 </h3>
                 <p>
-                  Electrician technician bookings connect customers with certified electrical contractors. While BuildNow verifies contractor certifications, customers are advised to verify site safety requirements and oversee final testing upon installation.
+                  Electrician technician bookings connect customers with certified electrical contractors. While Smartrun verifies contractor certifications, customers are advised to verify site safety requirements and oversee final testing upon installation.
                 </p>
               </section>
 
@@ -559,7 +559,7 @@ export const LegalView: React.FC<LegalViewProps> = ({ onBack, type }) => {
                 <div>
                   <p className="font-bold text-slate-900">Store &amp; Central Depot</p>
                   <p className="text-[11px] text-slate-600 leading-relaxed mt-0.5">
-                    BuildNow, Bediadanga 1st Lane, Nator Park, Kasba, Kolkata, West Bengal 700039, India
+                    Smartrun, Bediadanga 1st Lane, Nator Park, Kasba, Kolkata, West Bengal 700039, India
                   </p>
                 </div>
               </div>

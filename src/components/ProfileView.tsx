@@ -57,7 +57,6 @@ interface ProfileViewProps {
   onLogout: () => void;
   onAddToCart?: (product: Product) => void;
   allProducts?: Product[];
-  onOpenAddProduct?: () => void;
 }
 
 export const ProfileView: React.FC<ProfileViewProps> = ({
@@ -74,8 +73,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
   onProfileUpdated,
   onLogout,
   onAddToCart,
-  allProducts,
-  onOpenAddProduct
+  allProducts
 }) => {
   // Current active sub-page view: 'main' | 'orders' | 'addresses' | 'payments' | 'wallet' | 'services' | 'membership' | 'help' | 'notifications' | 'privacy' | 'terms' | 'favorites'
   const [subPage, setSubPage] = useState<
@@ -685,7 +683,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
         {/* App Version Tag & Build Status */}
         <div className="text-center pt-6 pb-2 space-y-1">
           <p className="text-[11px] font-bold text-slate-500">
-            BuildNow App Version 2.4.0
+            Smartrun App Version 2.4.0
           </p>
           <div className="flex items-center justify-center gap-2 text-[10px] text-slate-400">
             <span className="inline-block w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
