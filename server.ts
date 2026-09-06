@@ -599,7 +599,7 @@ function generateLoginAlertEmailHtml(params: {
         </div>
 
         <div style="text-align: center; margin-top: 14px;">
-          <a href="https://www.girirajpower.in/login" style="display: inline-block; background-color: #dc2626; color: #ffffff; text-decoration: none; font-weight: 800; font-size: 13px; padding: 10px 22px; border-radius: 8px; margin: 4px; box-shadow: 0 2px 4px rgba(220, 38, 38, 0.2);">
+          <a href="https://smartrun.in/login" style="display: inline-block; background-color: #dc2626; color: #ffffff; text-decoration: none; font-weight: 800; font-size: 13px; padding: 10px 22px; border-radius: 8px; margin: 4px; box-shadow: 0 2px 4px rgba(220, 38, 38, 0.2);">
             🔒 Secure Account &amp; Reset Password
           </a>
           <a href="tel:+918777400280" style="display: inline-block; background-color: #0f172a; color: #ffffff; text-decoration: none; font-weight: 700; font-size: 13px; padding: 10px 18px; border-radius: 8px; margin: 4px;">
@@ -610,11 +610,11 @@ function generateLoginAlertEmailHtml(params: {
 
       <!-- Security Best Practices -->
       <div style="border-top: 1px solid #e2e8f0; padding-top: 16px; font-size: 11px; color: #64748b; line-height: 1.5;">
-        <strong style="color: #334155; font-size: 12px;">🛡️ Security Tips from Giriraj Power:</strong>
+        <strong style="color: #334155; font-size: 12px;">🛡️ Security Tips from SmartRun &amp; Giriraj Power:</strong>
         <ul style="margin: 6px 0 0 0; padding-left: 18px;">
           <li>Never share your passwords, OTP codes, or magic links with anyone.</li>
-          <li>Giriraj Power / BuildNow staff will <strong>never</strong> call or email you asking for your password.</li>
-          <li>Always verify you are visiting <code>https://www.girirajpower.in</code> before entering your details.</li>
+          <li>SmartRun / Giriraj Power staff will <strong>never</strong> call or email you asking for your password.</li>
+          <li>Always verify you are visiting <code>https://smartrun.in</code> (or <code>https://www.girirajpower.in</code>) before entering your credentials.</li>
         </ul>
       </div>
 
@@ -623,10 +623,10 @@ function generateLoginAlertEmailHtml(params: {
     <!-- Footer -->
     <div style="background-color: #0f172a; color: #94a3b8; padding: 20px 24px; text-align: center; font-size: 11px; line-height: 1.5; border-top: 1px solid #334155;">
       <p style="margin: 0 0 6px 0; color: #f1f5f9; font-weight: 700;">
-        BuildNow by Giriraj Power — kasba Central Dispatch Hub
+        SmartRun by Giriraj Power — Kasba Central Dispatch Hub
       </p>
       <p style="margin: 0 0 8px 0;">
-        Kasba, Kolkata 700039, West Bengal | Support Email: team@girirajpower.in
+        Kasba, Kolkata 700039, West Bengal | Support: team@girirajpower.in | Web: https://smartrun.in
       </p>
       <p style="margin: 0; color: #64748b; font-size: 10px;">
         This automated security notification was sent to ${params.email} in accordance with our account protection protocol.
@@ -2841,7 +2841,7 @@ Tone: direct, confident, objective. Output ONLY the single sentence. No quotatio
           browser: req.body?.browser || "BuildNow App",
           loginMethod: req.body?.loginMethod || "Email & Password"
         });
-        text = text || `Security Alert: A new sign-in was detected on your BuildNow account (${to}) at ${req.body?.loginTime || 'recently'}. Location: ${req.body?.location || 'Kolkata, India'}. If this wasn't you, secure your account at https://www.girirajpower.in/login`;
+        text = text || `Security Alert: A new sign-in was detected on your SmartRun account (${to}) at ${req.body?.loginTime || 'recently'}. Location: ${req.body?.location || 'Kolkata, India'}. If this wasn't you, secure your account at https://smartrun.in/login`;
       } else if (type === "test_email") {
         subject = subject || "⚡ Resend Email Verification - Giriraj Power Kolkata";
         html = html || generateTestEmailHtml(customerName || "Valued Customer");
@@ -2981,7 +2981,7 @@ Tone: direct, confident, objective. Output ONLY the single sentence. No quotatio
       });
 
       const subject = `🛡️ Security Alert: New sign-in to your BuildNow account (${new Date().toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit' })} IST)`;
-      const text = `Hello ${customerName},\n\nA new login was detected on your BuildNow account (${cleanEmail}) on ${displayTime}.\nLocation: ${finalLocation}\nDevice: ${device || 'Mobile'} (${os || 'Android'})\nBrowser: ${browser || 'BuildNow App'}\nMethod: ${loginMethod || 'Password'}\n\nIf this was you, no action is required.\nIf you did not make this login, please secure your account immediately at https://www.girirajpower.in/login or call support at +91 87774 00280.`;
+      const text = `Hello ${customerName},\n\nA new login was detected on your SmartRun account (${cleanEmail}) on ${displayTime}.\nLocation: ${finalLocation}\nDevice: ${device || 'Mobile'} (${os || 'Android'})\nBrowser: ${browser || 'BuildNow App'}\nMethod: ${loginMethod || 'Password'}\n\nIf this was you, no action is required.\nIf you did not make this login, please secure your account immediately at https://smartrun.in/login or call support at +91 87774 00280.`;
 
       const dispatchResult = await dispatchResendEmail({
         to: cleanEmail,

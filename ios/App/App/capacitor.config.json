@@ -1,25 +1,49 @@
 {
 	"appId": "com.girirajpower.buildnow",
-	"appName": "BuildNow",
+	"appName": "SmartRun",
 	"webDir": "dist",
+	"server": {
+		"androidScheme": "https",
+		"cleartext": true,
+		"allowNavigation": [
+			"www.girirajpower.in",
+			"girirajpower.in",
+			"*.run.app",
+			"*.supabase.co",
+			"*.googleapis.com",
+			"*.gstatic.com",
+			"*.googletagmanager.com",
+			"unpkg.com",
+			"images.unsplash.com",
+			"i.imgur.com"
+		]
+	},
 	"plugins": {
 		"App": {},
+		"PushNotifications": {
+			"presentationOptions": [
+				"badge",
+				"sound",
+				"alert"
+			]
+		},
 		"SplashScreen": {
 			"launchShowDuration": 2000,
 			"launchAutoHide": true,
-			"backgroundColor": "#020617",
+			"backgroundColor": "#153d43",
 			"androidSplashResourceName": "splash",
 			"androidScaleType": "CENTER_CROP",
 			"showSpinner": false
 		},
 		"StatusBar": {
 			"style": "DARK",
-			"backgroundColor": "#020617"
+			"backgroundColor": "#153d43"
 		}
 	},
 	"packageClassList": [
 		"AppPlugin",
 		"PreferencesPlugin",
+		"PushNotificationsPlugin",
 		"SplashScreenPlugin",
 		"StatusBarPlugin"
 	]

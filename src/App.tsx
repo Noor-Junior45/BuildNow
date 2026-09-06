@@ -1042,12 +1042,12 @@ export default function App() {
         <div className="flex flex-col items-center space-y-3 animate-pulse">
           <img
             src="/buildnow.png"
-            alt="Smartrun Logo"
+            alt="SmartRun Logo"
             className="w-16 h-16 object-contain rounded-2xl shadow-sm border border-slate-200 bg-white p-1"
           />
           <div className="text-3xl font-bold font-bodoni flex items-center justify-center">
             <span className="text-slate-950">Smart</span>
-            <span className="text-[#00875a]">run</span>
+            <span className="text-[#00875a]">Run</span>
           </div>
           <p className="text-xs text-slate-400 font-semibold">Starting secure session...</p>
         </div>

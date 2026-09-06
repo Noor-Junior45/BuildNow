@@ -186,10 +186,10 @@ export const Header: React.FC<HeaderProps> = ({
               <button
                 onClick={() => onTabChange('home')}
                 className="text-lg sm:text-xl font-black tracking-tight leading-none flex items-center text-left cursor-pointer focus:outline-none font-sf-pro"
-                title="Smartrun - Home"
+                title="SmartRun - Home"
               >
                 <span className="text-black">Smart</span>
-                <span className="text-[#00875a]">run</span>
+                <span className="text-[#00875a]">Run</span>
               </button>
 
               {/* Saved Address House Name Only / Location Selector */}

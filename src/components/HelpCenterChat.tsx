@@ -46,7 +46,7 @@ export const HelpCenterChat: React.FC<HelpCenterChatProps> = ({ userProfile }) =
     {
       id: 'welcome-1',
       sender: 'assistant',
-      text: `Hello ${userProfile?.name || 'there'}! 👋 I am your **Smartrun 24/7 AI Support Specialist**.\n\nI can help you with Kolkata 60-min delivery updates, technical wire/MCB sizing recommendations, GST invoices, electrician bookings, and store policies. How may I assist you today?`,
+      text: `Hello ${userProfile?.name || 'there'}! 👋 I am your **SmartRun 24/7 AI Support Specialist**.\n\nI can help you with Kolkata 60-min delivery updates, technical wire/MCB sizing recommendations, GST invoices, electrician bookings, and store policies. How may I assist you today?`,
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     }
   ]);
@@ -204,7 +204,7 @@ export const HelpCenterChat: React.FC<HelpCenterChatProps> = ({ userProfile }) =
                 Live 24/7
               </span>
             </div>
-            <h2 className="text-base sm:text-lg font-black text-slate-900 mt-1">Smartrun AI Help Desk</h2>
+            <h2 className="text-base sm:text-lg font-black text-slate-900 mt-1">SmartRun AI Help Desk</h2>
           </div>
 
           {/* Direct External Option: Email Support */}

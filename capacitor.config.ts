@@ -2,12 +2,14 @@ import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
   appId: 'com.girirajpower.buildnow',
-  appName: 'Smartrun',
+  appName: 'SmartRun',
   webDir: 'dist',
   server: {
     androidScheme: 'https',
     cleartext: true,
     allowNavigation: [
+      'smartrun.in',
+      'www.smartrun.in',
       'www.girirajpower.in',
       'girirajpower.in',
       '*.run.app',

@@ -1,6 +1,6 @@
 {
 	"appId": "com.girirajpower.buildnow",
-	"appName": "BuildNow",
+	"appName": "SmartRun",
 	"webDir": "dist",
 	"server": {
 		"androidScheme": "https",

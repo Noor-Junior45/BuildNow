@@ -159,7 +159,7 @@ export const InstallAppModal: React.FC<InstallAppModalProps> = ({
           <div className="relative mx-auto w-20 h-20 mb-3 rounded-2xl bg-white p-2.5 shadow-xl flex items-center justify-center border-2 border-amber-400/30">
             <img
               src="/buildnow.png"
-              alt="Smartrun App"
+              alt="SmartRun App"
               className="w-full h-full object-contain rounded-xl"
             />
             <div className="absolute -bottom-1.5 -right-1.5 bg-amber-400 text-slate-950 p-1 rounded-full shadow-md">
@@ -168,7 +168,7 @@ export const InstallAppModal: React.FC<InstallAppModalProps> = ({
           </div>
 
           <h3 className="text-xl font-black tracking-tight text-white flex items-center justify-center gap-1.5">
-            <span>Download Smartrun App</span>
+            <span>Download SmartRun App</span>
           </h3>
           <p className="text-xs text-slate-300 mt-1 max-w-xs mx-auto">
             Install on your phone or desktop for instant 1-tap orders, fast loading, and offline catalog access.
@@ -186,7 +186,7 @@ export const InstallAppModal: React.FC<InstallAppModalProps> = ({
               </div>
               <h4 className="text-base font-bold text-slate-900">App Ready on Your Device!</h4>
               <p className="text-xs text-slate-600">
-                Smartrun is installed. You can now launch it directly from your Home Screen or Apps menu anytime.
+                SmartRun is installed. You can now launch it directly from your Home Screen or Apps menu anytime.
               </p>
               <button
                 onClick={onClose}

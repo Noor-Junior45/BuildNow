@@ -1,12 +1,15 @@
 {
-  "name": "BuildNow | Electrical & Construction Supplies",
-  "short_name": "BuildNow",
-  "description": "Kolkata's wholesale electrical equipment, construction materials, and certified wiring delivery platform with 60-min to 7-day express delivery.",
+  "name": "SmartRun | Electrical & Construction Supplies",
+  "short_name": "SmartRun",
+  "description": "Kolkata's premier wholesale electrical equipment, construction materials, and certified wiring delivery platform with 60-min express delivery.",
+  "id": "/",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
   "orientation": "portrait-primary",
   "background_color": "#ffffff",
   "theme_color": "#0f172a",
+  "prefer_related_applications": false,
   "icons": [
     {
       "src": "/icons/icon-192.png",

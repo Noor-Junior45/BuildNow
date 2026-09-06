@@ -5,7 +5,7 @@ import { Capacitor } from '@capacitor/core';
  *
  * In native mobile builds (Android & iOS WebView), relative fetch('/api/...') calls
  * fail because there is no local backend server inside the device container.
- * This resolves to the live backend server (https://www.girirajpower.in) or VITE_API_BASE_URL,
+ * This resolves to the live backend server (https://smartrun.in / https://www.girirajpower.in) or VITE_API_BASE_URL,
  * while preserving standard relative paths in web browsers.
  */
 export const API_BASE_URL: string = (() => {
@@ -35,7 +35,7 @@ export const API_BASE_URL: string = (() => {
     hostname === '10.0.2.2';
 
   if (isCapacitorNative) {
-    return 'https://www.girirajpower.in';
+    return 'https://smartrun.in';
   }
 
   return '';

@@ -49,6 +49,12 @@ export default defineConfig(() => {
     },
     server: {
       hmr: true,
+      watch: {
+        ignored: ['**/ios/**', '**/android/**', '**/dist/**'],
+      },
+    },
+    optimizeDeps: {
+      entries: ['index.html'],
     },
   };
 });

@@ -985,7 +985,7 @@ export const HomePage: React.FC<HomePageProps> = ({
         )}
 
         {/* =====================================================================
-            ROW 6: WHY CHOOSE SMARTRUN (Giriraj Power & Smartrun Same Ownership)
+            ROW 6: WHY CHOOSE SMARTRUN (Giriraj Power & SmartRun Same Ownership)
             ===================================================================== */}
         <section
           id="row-6-trust"
@@ -1030,11 +1030,11 @@ export const HomePage: React.FC<HomePageProps> = ({
                   <Zap className="w-3.5 h-3.5 fill-amber-500 text-amber-500" />
                 </span>
                 <h2 className="text-xl sm:text-2xl lg:text-3xl font-bold font-sf-pro text-[#0F1B2D] tracking-tight">
-                  Why Choose Smartrun?
+                  Why Choose SmartRun?
                 </h2>
               </div>
               <p className="text-[11px] sm:text-xs text-[#5F6B7A] font-medium leading-relaxed max-w-lg mx-auto">
-                <span className="font-bold text-[#0F1B2D]">Smartrun</span> and <span className="font-bold text-[#0F1B2D]">Giriraj Power</span> are under the same ownership &amp; management—delivering genuine electricals and construction materials with wholesale transparency across Kolkata.
+                <span className="font-bold text-[#0F1B2D]">SmartRun</span> and <span className="font-bold text-[#0F1B2D]">Giriraj Power</span> are under the same ownership &amp; management—delivering genuine electricals and construction materials with wholesale transparency across Kolkata.
               </p>
             </div>
 
@@ -1142,7 +1142,7 @@ export const HomePage: React.FC<HomePageProps> = ({
               <span className="pointer-events-none absolute inset-x-0 top-0 h-[50%] bg-gradient-to-b from-white/60 to-transparent z-1" />
               <Info className="relative z-10 w-4 h-4 text-[#FF9800] shrink-0" />
               <p className="relative z-10 text-[10px] sm:text-xs text-[#5F6B7A] leading-relaxed">
-                <span className="font-semibold text-[#0F1B2D]">Giriraj Power &amp; Smartrun</span> operate under unified ownership. Standard deliveries take 1–7 working days with express local dispatch available.
+                <span className="font-semibold text-[#0F1B2D]">Giriraj Power &amp; SmartRun</span> operate under unified ownership. Standard deliveries take 1–7 working days with express local dispatch available.
               </p>
             </div>
 
@@ -1154,7 +1154,7 @@ export const HomePage: React.FC<HomePageProps> = ({
                     onOpenBulkQuoteModal();
                   } else {
                     window.open(
-                      'https://wa.me/918777400280?text=Hi%20Smartrun%20/%20Giriraj%20Power,%20I%20would%20like%20to%20request%20a%20project%20wholesale%20quote.',
+                      'https://wa.me/918777400280?text=Hi%20SmartRun%20/%20Giriraj%20Power,%20I%20would%20like%20to%20request%20a%20project%20wholesale%20quote.',
                       '_blank'
                     );
                   }

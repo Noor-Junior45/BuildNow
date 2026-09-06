@@ -278,7 +278,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onAuthSuccess }) => {
           <div className="relative">
             <img
               src="/buildnow.png"
-              alt="Smartrun Logo"
+              alt="SmartRun Logo"
               className="w-16 h-16 object-contain rounded-2xl shadow-sm border border-slate-100 p-1 bg-white"
             />
             <span className="absolute -bottom-1 -right-1 w-4 h-4 bg-emerald-500 rounded-full border-2 border-white flex items-center justify-center" />
@@ -287,7 +287,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onAuthSuccess }) => {
           <div>
             <div className="text-3xl font-bold font-bodoni flex items-center justify-center leading-none tracking-tight">
               <span className="text-slate-950">Smart</span>
-              <span className="text-[#00875a]">run</span>
+              <span className="text-[#00875a]">Run</span>
             </div>
             <p className="text-xs text-slate-500 font-semibold mt-1">
               Electrical &amp; Construction Materials Hub
