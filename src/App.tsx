@@ -755,11 +755,6 @@ export default function App() {
           if (status.state === 'prompt') {
             setIsDeviceLocationPromptOpen(true);
           }
-          status.onchange = () => {
-            if (status.state === 'granted') {
-              setIsDeviceLocationPromptOpen(false);
-            }
-          };
         }
       } catch {
         // fail silently without blinking

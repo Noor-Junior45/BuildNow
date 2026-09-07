@@ -1,5 +1,7 @@
 import { KolkataArea } from '../types';
 import { KOLKATA_AREAS } from '../data/kolkataAreas';
+import { Capacitor } from '@capacitor/core';
+import { Geolocation } from '@capacitor/geolocation';
 
 export interface ResilientPosition {
   lat: number;
@@ -97,8 +99,7 @@ export async function reverseGeocodeWithFallback(
       }
     }
   } catch (err) {
-    // Graceful fallback to nearest area
-    console.debug('Reverse geocoding network notice (fallback used):', err);
+    console.debug('Reverse geocoding notice (fallback area used):', err);
   }
 
   const finalMatched = findNearestKolkataArea(lat, lng, pincode);
@@ -111,86 +112,140 @@ export async function reverseGeocodeWithFallback(
 }
 
 /**
- * Multi-Tier Resilient Geolocation Resolver for Android WebViews, PWAs & Mobile Browsers
- *
- * Tier 1: High accuracy GPS with 6s timeout & cached allowance
- * Tier 2: Network / Coarse cellular location fallback
- * Tier 3: watchPosition listener fallback (handles Android WebView getCurrentPosition stall)
+ * Safely wraps browser navigator.geolocation.getCurrentPosition with a hard timeout
  */
-export async function getResilientCurrentPosition(): Promise<ResilientPosition> {
-  if (typeof window === 'undefined' || !navigator.geolocation) {
-    throw new Error('Geolocation is not supported by this device or browser.');
-  }
+function tryWebPosition(options: PositionOptions, hardTimeoutMs: number): Promise<GeolocationPosition> {
+  return new Promise((resolve, reject) => {
+    if (typeof window === 'undefined' || !navigator.geolocation) {
+      reject(new Error('Geolocation is not supported by your browser.'));
+      return;
+    }
 
-  // Helper to wrap getCurrentPosition into a promise
-  const tryPosition = (options: PositionOptions): Promise<GeolocationPosition> => {
-    return new Promise((resolve, reject) => {
-      navigator.geolocation.getCurrentPosition(resolve, reject, options);
-    });
-  };
+    let settled = false;
+    const timer = setTimeout(() => {
+      if (!settled) {
+        settled = true;
+        reject(new Error(`Location request timed out after ${Math.round(hardTimeoutMs / 1000)}s`));
+      }
+    }, hardTimeoutMs);
 
-  // Helper using watchPosition as a fallback (often resolves instantly on Android WebViews)
-  const tryWatchPosition = (timeoutMs = 6000): Promise<GeolocationPosition> => {
-    return new Promise((resolve, reject) => {
-      let watchId: number | null = null;
-      const timeoutId = setTimeout(() => {
-        if (watchId !== null) {
-          navigator.geolocation.clearWatch(watchId);
-        }
-        reject(new Error('WatchPosition timed out'));
-      }, timeoutMs);
-
-      watchId = navigator.geolocation.watchPosition(
+    try {
+      navigator.geolocation.getCurrentPosition(
         (pos) => {
-          clearTimeout(timeoutId);
-          if (watchId !== null) {
-            navigator.geolocation.clearWatch(watchId);
+          if (!settled) {
+            settled = true;
+            clearTimeout(timer);
+            resolve(pos);
           }
-          resolve(pos);
         },
         (err) => {
-          clearTimeout(timeoutId);
-          if (watchId !== null) {
-            navigator.geolocation.clearWatch(watchId);
+          if (!settled) {
+            settled = true;
+            clearTimeout(timer);
+            reject(err);
           }
-          reject(err);
         },
-        { enableHighAccuracy: false, timeout: timeoutMs, maximumAge: 300000 }
+        options
       );
-    });
-  };
+    } catch (callErr) {
+      if (!settled) {
+        settled = true;
+        clearTimeout(timer);
+        reject(callErr);
+      }
+    }
+  });
+}
+
+/**
+ * Multi-Tier Resilient Geolocation Resolver:
+ * - On Native Android (APK): Uses @capacitor/geolocation with automatic runtime permission requests
+ * - On Web: Uses robust multi-tier HTML5 geolocation with hard timeouts & network fallback
+ */
+export async function getResilientCurrentPosition(): Promise<ResilientPosition> {
+  // 1. Native Capacitor App (Android APK / iOS)
+  if (Capacitor.isNativePlatform()) {
+    try {
+      // Check & request runtime permissions on Android
+      let perm = await Geolocation.checkPermissions();
+      if (perm.location !== 'granted') {
+        perm = await Geolocation.requestPermissions();
+      }
+
+      if (perm.location === 'denied') {
+        const error = new Error('Location permission was denied. Please allow location access in your Android app settings.');
+        (error as any).code = 1;
+        throw error;
+      }
+    } catch (permErr: any) {
+      if (permErr?.code === 1 || String(permErr?.message || '').toLowerCase().includes('denied')) {
+        throw permErr;
+      }
+      console.warn('Native permission check notice:', permErr);
+    }
+
+    // Try High Accuracy Native GPS
+    try {
+      const pos = await Promise.race([
+        Geolocation.getCurrentPosition({
+          enableHighAccuracy: true,
+          timeout: 10000,
+          maximumAge: 30000
+        }),
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error('GPS location timed out')), 12000)
+        )
+      ]);
+
+      return {
+        lat: pos.coords.latitude,
+        lng: pos.coords.longitude,
+        accuracy: pos.coords.accuracy
+      };
+    } catch (gpsErr) {
+      console.warn('Native high accuracy GPS failed or timed out, trying coarse/network...', gpsErr);
+      // Fallback to coarse/network native location
+      try {
+        const pos = await Promise.race([
+          Geolocation.getCurrentPosition({
+            enableHighAccuracy: false,
+            timeout: 10000,
+            maximumAge: 300000
+          }),
+          new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error('Network location timed out')), 12000)
+          )
+        ]);
+
+        return {
+          lat: pos.coords.latitude,
+          lng: pos.coords.longitude,
+          accuracy: pos.coords.accuracy
+        };
+      } catch (networkErr: any) {
+        console.warn('Native network location failed:', networkErr);
+        throw networkErr;
+      }
+    }
+  }
+
+  // 2. Web Browser
+  if (typeof window === 'undefined' || !navigator.geolocation) {
+    throw new Error('Geolocation is not supported by this browser.');
+  }
 
   let lastError: any = null;
 
-  // 1. First attempt: High Accuracy (GPS hardware) with moderate timeout and recent cache support
+  // Web Attempt 1: High Accuracy GPS (8s timeout)
   try {
-    const pos = await tryPosition({
-      enableHighAccuracy: true,
-      timeout: 6000,
-      maximumAge: 60000 // Accept location cached in the last 60 seconds
-    });
-    return {
-      lat: pos.coords.latitude,
-      lng: pos.coords.longitude,
-      accuracy: pos.coords.accuracy
-    };
-  } catch (err: any) {
-    lastError = err;
-    // If user explicitly denied permission (code 1), do not retry further
-    if (err && err.code === 1) {
-      const error = new Error('Location permission was denied. Please allow location access in your device settings.');
-      (error as any).code = 1;
-      throw error;
-    }
-  }
-
-  // 2. Second attempt: Coarse/Network/WiFi location (much faster & works indoors)
-  try {
-    const pos = await tryPosition({
-      enableHighAccuracy: false,
-      timeout: 10000,
-      maximumAge: 300000 // Accept up to 5 minute old network fix
-    });
+    const pos = await tryWebPosition(
+      {
+        enableHighAccuracy: true,
+        timeout: 7000,
+        maximumAge: 60000
+      },
+      8000
+    );
     return {
       lat: pos.coords.latitude,
       lng: pos.coords.longitude,
@@ -199,15 +254,22 @@ export async function getResilientCurrentPosition(): Promise<ResilientPosition> 
   } catch (err: any) {
     lastError = err;
     if (err && err.code === 1) {
-      const error = new Error('Location permission was denied. Please allow location access in your device settings.');
+      const error = new Error('Location permission was denied. Please allow location access in your browser address bar.');
       (error as any).code = 1;
       throw error;
     }
   }
 
-  // 3. Third attempt: WatchPosition fallback for Android WebViews
+  // Web Attempt 2: Coarse Network / Cellular / WiFi (works indoors & desktops)
   try {
-    const pos = await tryWatchPosition(6000);
+    const pos = await tryWebPosition(
+      {
+        enableHighAccuracy: false,
+        timeout: 8000,
+        maximumAge: 300000
+      },
+      9000
+    );
     return {
       lat: pos.coords.latitude,
       lng: pos.coords.longitude,
@@ -215,12 +277,17 @@ export async function getResilientCurrentPosition(): Promise<ResilientPosition> 
     };
   } catch (err: any) {
     lastError = err;
+    if (err && err.code === 1) {
+      const error = new Error('Location permission was denied. Please allow location access in your browser address bar.');
+      (error as any).code = 1;
+      throw error;
+    }
   }
 
-  // If all attempts failed
+  // If all attempts failed, provide clear message
   const finalError = new Error(
     lastError?.message ||
-      'Unable to retrieve current location. Please check your device GPS or select your area manually.'
+      'Unable to retrieve current location. Please verify your device GPS is on or choose your area manually.'
   );
   (finalError as any).code = lastError?.code;
   throw finalError;

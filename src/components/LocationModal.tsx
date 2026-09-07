@@ -444,7 +444,7 @@ export const LocationModal: React.FC<LocationModalProps> = ({
     onClose();
   };
 
-  // Trigger GPS Current Location fetch using Geolocation API directly without opening map
+  // Trigger GPS Current Location fetch using Geolocation API
   const handleDetectCurrentLocation = async (goToMap = false) => {
     setMapEntrySource('detect_location');
     setGpsLoading(true);
@@ -452,12 +452,6 @@ export const LocationModal: React.FC<LocationModalProps> = ({
     try {
       const coords = await mapManager.getCurrentPosition();
       setPinCoordinates(coords);
-
-      if (goToMap) {
-        setGpsLoading(false);
-        setStep('map_pin');
-        setTimeout(() => flyToCoords(coords.lat, coords.lng, 18), 150);
-      }
 
       const revRes = await mapManager.reverseGeocode(coords);
       const street = revRes.street || 'Kolkata';
@@ -487,28 +481,23 @@ export const LocationModal: React.FC<LocationModalProps> = ({
       setMatchedArea(updatedArea);
       setGpsLoading(false);
 
-      if (!goToMap) {
-        handleUseCurrentLocationDirectly(updatedArea, street);
-      }
-    } catch (err) {
-      console.warn('[LocationModal] GPS detection fallback:', err);
+      // Seamlessly transition to interactive map pin view so the user can verify their location
+      setStep('map_pin');
+      setTimeout(() => flyToCoords(coords.lat, coords.lng, 18), 150);
+      showToast(`Location detected: ${street}`, 'success');
+    } catch (err: any) {
+      console.warn('[LocationModal] GPS detection notice:', err);
       setGpsLoading(false);
 
-      const fallback = KOLKATA_AREAS[3]; // Sector V
-      const fallbackLat = fallback.lat || 22.5735;
-      const fallbackLng = fallback.lng || 88.4331;
-      setPinCoordinates({ lat: fallbackLat, lng: fallbackLng });
-      setMatchedArea(fallback);
-      const street = fallback.exactStreet || fallback.name;
-      setDetectedStreet(street);
-      setBuildingRoad(street);
-
-      if (goToMap) {
-        setStep('map_pin');
-        setTimeout(() => flyToCoords(fallbackLat, fallbackLng, 18), 150);
-      } else {
-        handleUseCurrentLocationDirectly(fallback, street);
-      }
+      const isDenied = err?.code === 1 || String(err?.message || '').toLowerCase().includes('denied');
+      showToast(
+        isDenied
+          ? 'Location permission denied. Please select your delivery area below.'
+          : 'Unable to acquire GPS fix. Please select your delivery area below.',
+        'info',
+        4000
+      );
+      // Keep modal open so the user can comfortably choose their delivery area or search manually
     }
   };
 

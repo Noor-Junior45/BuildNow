@@ -16,6 +16,7 @@ import { KOLKATA_AREAS } from '../data/kolkataAreas';
 import { ACTIVE_SAVED_ADDRESS_KEY } from '../services/supabaseService';
 import { useBottomSheetDismiss } from '../hooks/useBottomSheetDismiss';
 import { getResilientCurrentPosition, reverseGeocodeWithFallback } from '../utils/geolocationHelper';
+import { showToast } from '../utils/toast';
 
 interface DeviceLocationPromptModalProps {
   isOpen: boolean;
@@ -80,6 +81,7 @@ export const DeviceLocationPromptModal: React.FC<DeviceLocationPromptModalProps>
         console.error(e);
       }
 
+      showToast(`Location detected: ${street}`, 'success');
       onSelectArea(appliedArea, undefined);
       onClose();
     } catch (err: any) {

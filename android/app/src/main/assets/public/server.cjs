@@ -3488,8 +3488,8 @@ Respond ONLY with a valid JSON object matching the following structure:
   }));
   const distPath = import_path.default.join(process.cwd(), "dist");
   const distExists = import_fs.default.existsSync(import_path.default.join(distPath, "index.html"));
-  const useVite = process.env.NODE_ENV !== "production" && process.env.VITE_ENABLED === "true";
-  if (useVite || !distExists) {
+  const isProduction = process.env.NODE_ENV === "production";
+  if (!isProduction) {
     console.log("Starting Vite development middleware...");
     const vite = await (0, import_vite.createServer)({
       server: {
