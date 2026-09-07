@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Routes, Route, useNavigate, useLocation, Navigate } from 'react-router-dom';
 import { Product, CartItem, KolkataArea, SavedAddress, Order, WiringServiceBooking, UserProfile } from './types';
 import { INITIAL_PRODUCTS } from './data/products';
@@ -25,6 +25,8 @@ import { TechnicianDetailPage } from './components/technicians/TechnicianDetailP
 import { FloatingBottomNav } from './components/FloatingBottomNav';
 import { InstallAppModal } from './components/InstallAppModal';
 import { AddProductModal } from './components/AddProductModal';
+import { FloatingLiveOrderButton } from './components/orders/FloatingLiveOrderButton';
+import { LiveOrderDetailsModal } from './components/orders/LiveOrderDetailsModal';
 import { SEOHead } from './components/SEOHead';
 import {
   trackPageView,
@@ -163,6 +165,7 @@ export default function App() {
   const [isInstallModalOpen, setIsInstallModalOpen] = useState(false);
   const [isAddProductOpen, setIsAddProductOpen] = useState(false);
   const [selectedProductQuickView, setSelectedProductQuickView] = useState<Product | null>(null);
+  const [isLiveOrderModalOpen, setIsLiveOrderModalOpen] = useState(false);
 
   // Listen for open-add-product global custom event
   useEffect(() => {
@@ -171,6 +174,18 @@ export default function App() {
     return () => window.removeEventListener('open-add-product', handleOpenAddProduct);
   }, []);
   const [orders, setOrders] = useState<Order[]>([]);
+
+  // Current active live order (must NOT be delivered, cancelled, or failed)
+  const activeLiveOrder = useMemo(() => {
+    if (!orders || orders.length === 0) return null;
+    const activeList = orders.filter(
+      (o) => o.status !== 'delivered' && o.status !== 'cancelled' && o.status !== 'failed'
+    );
+    if (activeList.length === 0) return null;
+    return [...activeList].sort(
+      (a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()
+    )[0];
+  }, [orders]);
   const [savedAddresses, setSavedAddresses] = useState<SavedAddress[]>(() => getStoredAddresses());
 
   // User Profile
@@ -1082,7 +1097,8 @@ export default function App() {
             <Route path="/terms-of-service" element={<LegalView onBack={() => navigate('/login')} type="terms" />} />
             <Route path="/reset-password" element={<ResetPassword onOpenAuth={() => navigate('/login')} />} />
             
-            {/* All other routes (home, catalog, cart, profile, etc.) require login */}
+            {/* Explicit Login Route & Wildcard fallback */}
+            <Route path="/login" element={<LoginPage onAuthSuccess={handleAuthSuccess} />} />
             <Route path="*" element={<LoginPage onAuthSuccess={handleAuthSuccess} />} />
           </Routes>
         </main>
@@ -1261,7 +1277,7 @@ export default function App() {
                   setUserProfile(null);
                   setUserPhone(null);
                   setUserName('');
-                  navigate('/');
+                  navigate('/login', { replace: true });
                 }}
               />
             }
@@ -1457,6 +1473,19 @@ export default function App() {
             })
             .catch(() => {});
         }}
+      />
+
+      {/* Zomato-style Floating Map Route Circle Button for Current Active Order */}
+      <FloatingLiveOrderButton
+        order={activeLiveOrder}
+        onClick={() => setIsLiveOrderModalOpen(true)}
+      />
+
+      {/* Current Live Order Details Modal (Order confirmed < partner assigned < out for delivery, items, customer stack, price summary) */}
+      <LiveOrderDetailsModal
+        isOpen={isLiveOrderModalOpen}
+        order={activeLiveOrder}
+        onClose={() => setIsLiveOrderModalOpen(false)}
       />
 
     </div>

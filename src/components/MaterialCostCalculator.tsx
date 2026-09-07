@@ -1412,7 +1412,6 @@ export const MaterialCostCalculator: React.FC<MaterialCostCalculatorProps> = ({
                       onChange={(e) => setCatalogSearch(e.target.value)}
                       placeholder="Search material name..."
                       className="w-full pl-8 pr-3 py-1.5 text-xs bg-slate-50 rounded-lg border border-slate-200 focus:outline-none focus:ring-1 focus:ring-amber-500 focus:bg-white transition-all font-medium"
-                      autoFocus
                     />
                   </div>
                 </div>

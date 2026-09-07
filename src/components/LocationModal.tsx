@@ -791,7 +791,6 @@ export const LocationModal: React.FC<LocationModalProps> = ({
                   placeholder="Search street, area, PIN code..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  autoFocus
                   className="w-full bg-transparent border-none text-sm font-medium text-slate-900 placeholder:text-slate-400 focus:outline-none"
                 />
                 {isSearchingMap ? (

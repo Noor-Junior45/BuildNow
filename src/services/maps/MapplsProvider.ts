@@ -59,15 +59,16 @@ function loadMapplsScript(mapKey: string): Promise<boolean> {
 
       const script = document.createElement('script');
       script.id = 'mappls-web-sdk-script';
-      script.src = `https://apis.mappls.com/advancedmaps/api/${encodeURIComponent(mapKey)}/map_sdk?layer=raster&v=3.0`;
+      // Modern Mappls Web Maps SDK v3.0 standard endpoint
+      script.src = `https://sdk.mappls.com/map/sdk/web?v=3.0&access_token=${encodeURIComponent(mapKey)}`;
       script.async = true;
       script.defer = true;
 
       const timeout = setTimeout(() => {
-        console.warn('[MapplsProvider] Script loading timed out after 2.5 seconds');
+        console.warn('[MapplsProvider] Script loading timed out after 7 seconds');
         mapplsLoadFailed = true;
         resolve(false);
-      }, 2500);
+      }, 7000);
 
       script.onload = () => {
         clearTimeout(timeout);
@@ -134,11 +135,14 @@ export class MapplsProvider implements IMapProvider {
       throw new Error('Mappls Web Maps SDK failed to load from server.');
     }
 
-    // Ensure container is empty before initializing
+    // Ensure container is empty and has an ID before initializing
     container.innerHTML = '';
+    if (!container.id) {
+      container.id = `mappls-map-canvas-${Date.now()}`;
+    }
 
     const centerCoords = [options.center.lat, options.center.lng];
-    const map = new window.mappls.Map(container, {
+    const map = new window.mappls.Map(container.id, {
       center: centerCoords,
       zoom: options.zoom || 18,
       minZoom: options.minZoom || 11,

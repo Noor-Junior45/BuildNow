@@ -1,7 +1,7 @@
 import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
-  appId: 'com.girirajpower.buildnow',
+  appId: 'com.smartrun.app',
   appName: 'SmartRun',
   webDir: 'dist',
   server: {

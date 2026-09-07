@@ -1,4 +1,4 @@
-package com.girirajpower.buildnow;
+package com.smartrun.app;
 
 import com.getcapacitor.BridgeActivity;
 

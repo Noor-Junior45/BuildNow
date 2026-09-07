@@ -23,7 +23,13 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
 
-            <!-- Custom URL Scheme Deep Link: buildnow://product/:id -->
+            <!-- Custom URL Scheme Deep Links: smartrun:// and buildnow:// -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="smartrun" />
+            </intent-filter>
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
@@ -31,11 +37,13 @@
                 <data android:scheme="buildnow" />
             </intent-filter>
 
-            <!-- HTTPS App Links: https://www.girirajpower.in/... -->
+            <!-- HTTPS App Links: https://smartrun.in/... and https://www.girirajpower.in/... -->
             <intent-filter android:autoVerify="true">
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="https" android:host="smartrun.in" />
+                <data android:scheme="https" android:host="www.smartrun.in" />
                 <data android:scheme="https" android:host="www.girirajpower.in" />
                 <data android:scheme="https" android:host="girirajpower.in" />
             </intent-filter>

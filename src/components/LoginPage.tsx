@@ -334,7 +334,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onAuthSuccess }) => {
                     onChange={(e) => setEmail(e.target.value)}
                     className="w-full bg-transparent py-2 text-sm font-medium text-slate-900 placeholder:text-slate-400 focus:outline-none"
                     required
-                    autoFocus
                   />
                 </div>
               </div>
@@ -426,7 +425,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onAuthSuccess }) => {
                     onChange={(e) => setEmail(e.target.value)}
                     className="w-full bg-transparent py-2 text-sm font-medium text-slate-900 placeholder:text-slate-400 focus:outline-none"
                     required
-                    autoFocus
                   />
                 </div>
               </div>
@@ -533,7 +531,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onAuthSuccess }) => {
                     onChange={(e) => setEmail(e.target.value)}
                     className="w-full bg-transparent py-2 text-sm font-medium text-slate-900 placeholder:text-slate-400 focus:outline-none"
                     required
-                    autoFocus
                   />
                 </div>
               </div>

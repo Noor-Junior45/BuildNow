@@ -316,7 +316,6 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
                   onChange={(e) => setEnteredOtp(e.target.value.replace(/\D/g, ''))}
                   placeholder="• • • • • •"
                   className="w-full text-center tracking-[0.4em] text-lg font-black px-4 py-2.5 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-amber-400 text-slate-900 bg-white"
-                  autoFocus
                 />
               </div>
 

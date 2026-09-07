@@ -235,7 +235,7 @@ export const Header: React.FC<HeaderProps> = ({
               <div className="relative">
                 <ShoppingBag className="w-6 h-6 sm:w-6.5 sm:h-6.5" strokeWidth={2.2} />
                 {cartCount > 0 && (
-                  <span className="absolute -top-1.5 -right-2 bg-red-600 text-white text-[10px] font-black min-w-4.5 h-4.5 px-1 rounded-full flex items-center justify-center border-2 border-white animate-pulse shadow-xs">
+                  <span className="absolute -top-1.5 -right-2 bg-red-600 text-white text-[10px] font-black min-w-4.5 h-4.5 px-1 rounded-full flex items-center justify-center border-2 border-white shadow-xs">
                     {cartCount > 99 ? '99+' : cartCount}
                   </span>
                 )}

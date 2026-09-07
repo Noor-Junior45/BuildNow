@@ -125,7 +125,6 @@ export const SavedPaymentsSubPage: React.FC<SavedPaymentsSubPageProps> = ({
                 }}
                 className="flex-1 px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-400 bg-slate-50 focus:bg-white"
                 disabled={isSavingUpi}
-                autoFocus
               />
               <button
                 onClick={handleSaveUpi}

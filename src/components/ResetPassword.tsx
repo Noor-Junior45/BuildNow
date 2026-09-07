@@ -252,7 +252,6 @@ export const ResetPassword: React.FC<ResetPasswordProps> = ({ onSuccess, onOpenA
                     className="w-full px-3.5 py-2.5 text-sm font-semibold text-slate-900 focus:outline-none placeholder:text-slate-400"
                     required
                     minLength={6}
-                    autoFocus
                   />
                   <button
                     type="button"

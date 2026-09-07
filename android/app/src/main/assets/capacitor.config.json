@@ -1,11 +1,13 @@
 {
-	"appId": "com.girirajpower.buildnow",
+	"appId": "com.smartrun.app",
 	"appName": "SmartRun",
 	"webDir": "dist",
 	"server": {
 		"androidScheme": "https",
 		"cleartext": true,
 		"allowNavigation": [
+			"smartrun.in",
+			"www.smartrun.in",
 			"www.girirajpower.in",
 			"girirajpower.in",
 			"*.run.app",
