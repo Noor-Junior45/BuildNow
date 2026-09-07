@@ -1,7 +1,7 @@
 import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
-  appId: 'com.smartrun.app',
+  appId: 'in.smartrun.app',
   appName: 'SmartRun',
   webDir: 'dist',
   server: {
@@ -32,14 +32,14 @@ const config: CapacitorConfig = {
     SplashScreen: {
       launchShowDuration: 2000,
       launchAutoHide: true,
-      backgroundColor: '#153d43',
+      backgroundColor: '#F9C017',
       androidSplashResourceName: 'splash',
       androidScaleType: 'CENTER_CROP',
       showSpinner: false,
     },
     StatusBar: {
       style: 'DARK',
-      backgroundColor: '#153d43',
+      backgroundColor: '#F9C017',
     },
   },
 };

@@ -1760,6 +1760,146 @@ ${itemsListText}
       });
     }
   });
+  const liveRiderLocations = /* @__PURE__ */ new Map();
+  app.get("/api/orders/:id/rider-location", async (req, res) => {
+    res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
+    try {
+      const orderId = req.params.id;
+      if (!orderId) {
+        return res.status(400).json({ success: false, message: "Order ID is required." });
+      }
+      const live = liveRiderLocations.get(orderId);
+      if (live) {
+        return res.status(200).json({
+          success: true,
+          orderId,
+          location: live
+        });
+      }
+      const sb = getServerSupabase();
+      if (sb) {
+        try {
+          const { data } = await sb.from("orders").select("delivery_partner, notes").eq("id", orderId).single();
+          const partner = data?.delivery_partner;
+          const loc = partner?.current_location || partner?.location;
+          if (loc && typeof loc.lat === "number" && typeof loc.lng === "number") {
+            const dbLoc = {
+              orderId,
+              lat: loc.lat,
+              lng: loc.lng,
+              heading: loc.heading,
+              speed: loc.speed,
+              riderName: partner.name || "Delivery Partner",
+              updatedAt: loc.updatedAt || (/* @__PURE__ */ new Date()).toISOString()
+            };
+            liveRiderLocations.set(orderId, dbLoc);
+            return res.status(200).json({
+              success: true,
+              orderId,
+              location: dbLoc
+            });
+          }
+        } catch {
+        }
+      }
+      return res.status(200).json({
+        success: true,
+        orderId,
+        location: null,
+        message: "No live rider GPS recorded yet."
+      });
+    } catch (err) {
+      return res.status(500).json({
+        success: false,
+        message: err.message || "Failed to get rider location."
+      });
+    }
+  });
+  app.post("/api/orders/:id/rider-location", async (req, res) => {
+    res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
+    try {
+      const orderId = req.params.id;
+      const { lat, lng, heading, speed, riderName, partnerId } = req.body || {};
+      const numLat = Number(lat);
+      const numLng = Number(lng);
+      if (isNaN(numLat) || isNaN(numLng) || numLat < -90 || numLat > 90 || numLng < -180 || numLng > 180) {
+        return res.status(400).json({
+          success: false,
+          message: "Valid numeric latitude (-90 to 90) and longitude (-180 to 180) are required."
+        });
+      }
+      const record = {
+        orderId,
+        lat: numLat,
+        lng: numLng,
+        heading: typeof heading === "number" ? heading : void 0,
+        speed: typeof speed === "number" ? speed : void 0,
+        riderName: riderName || "Delivery Partner",
+        partnerId: partnerId || void 0,
+        updatedAt: (/* @__PURE__ */ new Date()).toISOString()
+      };
+      liveRiderLocations.set(orderId, record);
+      const sb = getServerSupabase();
+      if (sb) {
+        try {
+          await sb.from("orders").update({
+            delivery_partner: {
+              name: record.riderName,
+              lat: record.lat,
+              lng: record.lng,
+              current_location: record
+            }
+          }).eq("id", orderId);
+        } catch (dbErr) {
+          console.warn("[Server POST /api/orders/:id/rider-location DB notice]:", dbErr);
+        }
+      }
+      return res.status(200).json({
+        success: true,
+        orderId,
+        location: record,
+        message: "Rider live GPS updated successfully."
+      });
+    } catch (err) {
+      console.error("Error updating rider GPS:", err);
+      return res.status(500).json({
+        success: false,
+        message: err.message || "Failed to update rider location."
+      });
+    }
+  });
+  app.post("/api/rider/location", async (req, res) => {
+    res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
+    try {
+      const { orderId, lat, lng, heading, speed, riderName, partnerId } = req.body || {};
+      if (!orderId) {
+        return res.status(400).json({ success: false, message: "orderId is required." });
+      }
+      const numLat = Number(lat);
+      const numLng = Number(lng);
+      if (isNaN(numLat) || isNaN(numLng)) {
+        return res.status(400).json({ success: false, message: "Valid lat and lng required." });
+      }
+      const record = {
+        orderId,
+        lat: numLat,
+        lng: numLng,
+        heading: typeof heading === "number" ? heading : void 0,
+        speed: typeof speed === "number" ? speed : void 0,
+        riderName: riderName || "Delivery Partner",
+        partnerId: partnerId || void 0,
+        updatedAt: (/* @__PURE__ */ new Date()).toISOString()
+      };
+      liveRiderLocations.set(orderId, record);
+      return res.status(200).json({
+        success: true,
+        orderId,
+        location: record
+      });
+    } catch (err) {
+      return res.status(500).json({ success: false, message: err.message || "Failed" });
+    }
+  });
   app.delete("/api/orders/:id", async (req, res) => {
     res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
     try {
@@ -3346,17 +3486,21 @@ Respond ONLY with a valid JSON object matching the following structure:
       res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
     }
   }));
-  if (process.env.NODE_ENV !== "production") {
+  const distPath = import_path.default.join(process.cwd(), "dist");
+  const distExists = import_fs.default.existsSync(import_path.default.join(distPath, "index.html"));
+  const useVite = process.env.NODE_ENV !== "production" && process.env.VITE_ENABLED === "true";
+  if (useVite || !distExists) {
+    console.log("Starting Vite development middleware...");
     const vite = await (0, import_vite.createServer)({
       server: {
         middlewareMode: true,
-        hmr: true
+        hmr: false
       },
       appType: "spa"
     });
     app.use(vite.middlewares);
   } else {
-    const distPath = import_path.default.join(process.cwd(), "dist");
+    console.log("Serving pre-compiled production build from dist/ (Vite dev server OFF)...");
     app.use(
       "/assets",
       import_express.default.static(import_path.default.join(distPath, "assets"), {

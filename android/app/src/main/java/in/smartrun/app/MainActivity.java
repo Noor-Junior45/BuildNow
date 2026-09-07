@@ -1,4 +1,4 @@
-package com.smartrun.app;
+package in.smartrun.app;
 
 import com.getcapacitor.BridgeActivity;
 
