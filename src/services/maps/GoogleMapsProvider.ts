@@ -33,10 +33,10 @@ export class GoogleMapsProvider implements IMapProvider {
       attributionControl: false
     });
 
-    // CartoDB Voyager tiles (Google Maps-matched clean styling)
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+    // OpenStreetMap standard tiles (crisp, high reliability, zero watermark)
+    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
       maxZoom: 19,
-      subdomains: 'abcd'
+      attribution: '&copy; OpenStreetMap contributors'
     }).addTo(map);
 
     if (options.onMoveStart) {

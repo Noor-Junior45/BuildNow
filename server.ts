@@ -2110,6 +2110,191 @@ async function startServer() {
     }
   });
 
+  // ==========================================
+  // LIVE RIDER LOCATION API (GPS BROADCAST & RETRIEVAL)
+  // ==========================================
+  interface LiveRiderLocationRecord {
+    orderId: string;
+    lat: number;
+    lng: number;
+    heading?: number;
+    speed?: number;
+    riderName?: string;
+    partnerId?: string;
+    updatedAt: string;
+  }
+  const liveRiderLocations = new Map<string, LiveRiderLocationRecord>();
+
+  // GET /api/orders/:id/rider-location -> Live GPS coordinate fetch
+  app.get("/api/orders/:id/rider-location", async (req, res) => {
+    res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
+    try {
+      const orderId = req.params.id;
+      if (!orderId) {
+        return res.status(400).json({ success: false, message: "Order ID is required." });
+      }
+
+      // 1. Check in-memory live GPS cache
+      const live = liveRiderLocations.get(orderId);
+      if (live) {
+        return res.status(200).json({
+          success: true,
+          orderId,
+          location: live
+        });
+      }
+
+      // 2. Check Database record if available
+      const sb = getServerSupabase();
+      if (sb) {
+        try {
+          const { data } = await sb
+            .from("orders")
+            .select("delivery_partner, notes")
+            .eq("id", orderId)
+            .single();
+
+          const partner = data?.delivery_partner as any;
+          const loc = partner?.current_location || partner?.location;
+          if (loc && typeof loc.lat === "number" && typeof loc.lng === "number") {
+            const dbLoc: LiveRiderLocationRecord = {
+              orderId,
+              lat: loc.lat,
+              lng: loc.lng,
+              heading: loc.heading,
+              speed: loc.speed,
+              riderName: partner.name || "Delivery Partner",
+              updatedAt: loc.updatedAt || new Date().toISOString()
+            };
+            liveRiderLocations.set(orderId, dbLoc);
+            return res.status(200).json({
+              success: true,
+              orderId,
+              location: dbLoc
+            });
+          }
+        } catch {
+          // fallback
+        }
+      }
+
+      return res.status(200).json({
+        success: true,
+        orderId,
+        location: null,
+        message: "No live rider GPS recorded yet."
+      });
+    } catch (err: any) {
+      return res.status(500).json({
+        success: false,
+        message: err.message || "Failed to get rider location."
+      });
+    }
+  });
+
+  // POST /api/orders/:id/rider-location -> Rider App / Delivery Partner GPS broadcast
+  app.post("/api/orders/:id/rider-location", async (req, res) => {
+    res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
+    try {
+      const orderId = req.params.id;
+      const { lat, lng, heading, speed, riderName, partnerId } = req.body || {};
+
+      const numLat = Number(lat);
+      const numLng = Number(lng);
+
+      if (isNaN(numLat) || isNaN(numLng) || numLat < -90 || numLat > 90 || numLng < -180 || numLng > 180) {
+        return res.status(400).json({
+          success: false,
+          message: "Valid numeric latitude (-90 to 90) and longitude (-180 to 180) are required."
+        });
+      }
+
+      const record: LiveRiderLocationRecord = {
+        orderId,
+        lat: numLat,
+        lng: numLng,
+        heading: typeof heading === "number" ? heading : undefined,
+        speed: typeof speed === "number" ? speed : undefined,
+        riderName: riderName || "Delivery Partner",
+        partnerId: partnerId || undefined,
+        updatedAt: new Date().toISOString()
+      };
+
+      liveRiderLocations.set(orderId, record);
+
+      // Persist to database if Supabase is connected
+      const sb = getServerSupabase();
+      if (sb) {
+        try {
+          await sb
+            .from("orders")
+            .update({
+              delivery_partner: {
+                name: record.riderName,
+                lat: record.lat,
+                lng: record.lng,
+                current_location: record
+              }
+            })
+            .eq("id", orderId);
+        } catch (dbErr) {
+          console.warn("[Server POST /api/orders/:id/rider-location DB notice]:", dbErr);
+        }
+      }
+
+      return res.status(200).json({
+        success: true,
+        orderId,
+        location: record,
+        message: "Rider live GPS updated successfully."
+      });
+    } catch (err: any) {
+      console.error("Error updating rider GPS:", err);
+      return res.status(500).json({
+        success: false,
+        message: err.message || "Failed to update rider location."
+      });
+    }
+  });
+
+  // POST /api/rider/location -> Generic endpoint for rider GPS telemetry
+  app.post("/api/rider/location", async (req, res) => {
+    res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
+    try {
+      const { orderId, lat, lng, heading, speed, riderName, partnerId } = req.body || {};
+      if (!orderId) {
+        return res.status(400).json({ success: false, message: "orderId is required." });
+      }
+
+      const numLat = Number(lat);
+      const numLng = Number(lng);
+      if (isNaN(numLat) || isNaN(numLng)) {
+        return res.status(400).json({ success: false, message: "Valid lat and lng required." });
+      }
+
+      const record: LiveRiderLocationRecord = {
+        orderId,
+        lat: numLat,
+        lng: numLng,
+        heading: typeof heading === "number" ? heading : undefined,
+        speed: typeof speed === "number" ? speed : undefined,
+        riderName: riderName || "Delivery Partner",
+        partnerId: partnerId || undefined,
+        updatedAt: new Date().toISOString()
+      };
+
+      liveRiderLocations.set(orderId, record);
+
+      return res.status(200).json({
+        success: true,
+        orderId,
+        location: record
+      });
+    } catch (err: any) {
+      return res.status(500).json({ success: false, message: err.message || "Failed" });
+    }
+  });
+
   // Delete specific order from Supabase and Server Caches
   app.delete("/api/orders/:id", async (req, res) => {
     res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
@@ -3972,19 +4157,25 @@ Respond ONLY with a valid JSON object matching the following structure:
     }
   }));
 
-  // Vite middleware for development vs Production Static Serving with Intelligent Caching
-  if (process.env.NODE_ENV !== "production") {
+  // Vite middleware vs Serving Pre-compiled Static Build
+  const distPath = path.join(process.cwd(), "dist");
+  const distExists = fs.existsSync(path.join(distPath, "index.html"));
+
+  // Vite is turned off by default for AI Studio preview, serving the clean static build without dev WebSockets
+  const useVite = process.env.NODE_ENV !== "production" && process.env.VITE_ENABLED === "true";
+
+  if (useVite || !distExists) {
+    console.log("Starting Vite development middleware...");
     const vite = await createViteServer({
       server: {
         middlewareMode: true,
-        hmr: true,
+        hmr: false,
       },
       appType: "spa",
     });
     app.use(vite.middlewares);
   } else {
-    const distPath = path.join(process.cwd(), "dist");
-
+    console.log("Serving pre-compiled production build from dist/ (Vite dev server OFF)...");
     // 1. Immutable Long-term Caching for Bundled Hashed Assets (JS, CSS, Media)
     app.use(
       "/assets",
@@ -3999,7 +4190,7 @@ Respond ONLY with a valid JSON object matching the following structure:
       express.static(distPath, {
         setHeaders: (res, filePath) => {
           if (filePath.endsWith(".html")) {
-            // HTML files should never be cached permanently so deployments reflect instantly
+            // HTML files should never be cached permanently so updates reflect instantly
             res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
             res.setHeader("Pragma", "no-cache");
             res.setHeader("Expires", "0");

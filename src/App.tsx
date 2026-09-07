@@ -27,6 +27,7 @@ import { InstallAppModal } from './components/InstallAppModal';
 import { AddProductModal } from './components/AddProductModal';
 import { FloatingLiveOrderButton } from './components/orders/FloatingLiveOrderButton';
 import { LiveOrderDetailsModal } from './components/orders/LiveOrderDetailsModal';
+import { LiveOrderPage } from './components/orders/LiveOrderPage';
 import { SEOHead } from './components/SEOHead';
 import {
   trackPageView,
@@ -114,6 +115,7 @@ export default function App() {
 
   const getActiveTabFromLocation = (): 'home' | 'catalog' | 'orders' | 'profile' | 'cart' | 'privacy' | 'terms' | 'electrical' | 'construction' | 'technicians' => {
     const path = location.pathname.toLowerCase();
+    if (path.startsWith('/live-order')) return 'orders';
     if (path.startsWith('/electrical')) return 'electrical';
     if (path.startsWith('/construction')) return 'construction';
     if (path.startsWith('/technician')) return 'technicians';
@@ -1111,8 +1113,8 @@ export default function App() {
       {/* Dynamic SEO Meta & Structured Data Manager */}
       <SEOHead />
       
-      {/* Top Header - Hidden when viewing profile */}
-      {location.pathname !== '/profile' && (
+      {/* Top Header - Hidden when viewing profile or live-order */}
+      {location.pathname !== '/profile' && !location.pathname.startsWith('/live-order') && (
         <Header
           currentArea={currentArea}
           activeAddress={activeSavedAddress}
@@ -1311,6 +1313,41 @@ export default function App() {
             }
           />
 
+          {/* DEDICATED LIVE ORDER TRACKING PAGE */}
+          <Route
+            path="/live-order"
+            element={
+              <LiveOrderPage
+                order={activeLiveOrder}
+                orders={orders}
+                onBack={() => {
+                  if (window.history.length > 1) {
+                    navigate(-1);
+                  } else {
+                    navigate('/orders');
+                  }
+                }}
+              />
+            }
+          />
+          <Route
+            path="/live-order/:orderId"
+            element={
+              <LiveOrderPage
+                orders={orders}
+                onBack={() => {
+                  if (window.history.length > 1) {
+                    navigate(-1);
+                  } else {
+                    navigate('/orders');
+                  }
+                }}
+              />
+            }
+          />
+          <Route path="/orders/live" element={<Navigate to="/live-order" replace />} />
+          <Route path="/track-order" element={<Navigate to="/live-order" replace />} />
+
           {/* LEGAL & COMPANY VIEWS */}
           <Route path="/about" element={<LegalView onBack={() => navigate('/')} type="about" />} />
           <Route path="/about-us" element={<LegalView onBack={() => navigate('/')} type="about" />} />
@@ -1475,13 +1512,15 @@ export default function App() {
         }}
       />
 
-      {/* Zomato-style Floating Map Route Circle Button for Current Active Order */}
-      <FloatingLiveOrderButton
-        order={activeLiveOrder}
-        onClick={() => setIsLiveOrderModalOpen(true)}
-      />
+      {/* Zomato-style Floating Map Route Circle Button for Current Active Order (Navigates directly to dedicated live order page) */}
+      {!location.pathname.startsWith('/live-order') && (
+        <FloatingLiveOrderButton
+          order={activeLiveOrder}
+          onClick={() => navigate('/live-order')}
+        />
+      )}
 
-      {/* Current Live Order Details Modal (Order confirmed < partner assigned < out for delivery, items, customer stack, price summary) */}
+      {/* Legacy/Fallback Live Order Handler (Safely redirects to dedicated page across all devices) */}
       <LiveOrderDetailsModal
         isOpen={isLiveOrderModalOpen}
         order={activeLiveOrder}

@@ -88,6 +88,9 @@ export interface DeliveryPartner {
   is_active?: boolean;
   avatar_url?: string | null;
   currentHub?: string;
+  lat?: number;
+  lng?: number;
+  current_location?: { lat: number; lng: number; heading?: number; speed?: number; updatedAt?: string };
 }
 
 export interface ProofOfDelivery {
@@ -114,6 +117,9 @@ export interface DeliveryRecord {
   delivery_notes?: string | null;
   proof_of_delivery?: ProofOfDelivery | null;
   delivery_partner?: DeliveryPartner | null;
+  rider_location?: { lat: number; lng: number; heading?: number; speed?: number; updatedAt?: string } | null;
+  current_lat?: number;
+  current_lng?: number;
 }
 
 export interface DeliveryTrackingEvent {
@@ -186,6 +192,13 @@ export interface Order {
   deliveryPartner?: DeliveryPartner;
   delivery?: DeliveryRecord;
   trackingEvents?: DeliveryTrackingEvent[];
+  riderLocation?: {
+    lat: number;
+    lng: number;
+    heading?: number;
+    speed?: number;
+    updatedAt?: string;
+  } | null;
   notes?: string;
   trackingNumber?: string;
   orderNumber?: string;
