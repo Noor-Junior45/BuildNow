@@ -4161,10 +4161,10 @@ Respond ONLY with a valid JSON object matching the following structure:
   const distPath = path.join(process.cwd(), "dist");
   const distExists = fs.existsSync(path.join(distPath, "index.html"));
 
-  // Vite is turned off by default for AI Studio preview, serving the clean static build without dev WebSockets
-  const useVite = process.env.NODE_ENV !== "production" && process.env.VITE_ENABLED === "true";
+  // Vite middleware for development mode
+  const isProduction = process.env.NODE_ENV === "production";
 
-  if (useVite || !distExists) {
+  if (!isProduction) {
     console.log("Starting Vite development middleware...");
     const vite = await createViteServer({
       server: {

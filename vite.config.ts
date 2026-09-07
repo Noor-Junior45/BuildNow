@@ -8,9 +8,9 @@ const APP_VERSION = process.env.npm_package_version || '2.4.0';
 const BUILD_TIME = new Date().toISOString();
 const BUILD_ID = process.env.BUILD_ID || process.env.VITE_APP_BUILD_ID || `v${APP_VERSION}-${Date.now()}`;
 
-export default defineConfig(() => {
+export default defineConfig(({ command }) => {
   return {
-    base: './',
+    base: command === 'serve' ? '/' : './',
     plugins: [
       react(),
       tailwindcss(),
