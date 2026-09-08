@@ -21,6 +21,19 @@ if (typeof window !== 'undefined' && L && L.DomUtil) {
   }
 }
 
+// West Bengal State Geoboundaries:
+// Restricts zooming out and panning strictly to West Bengal territory (not other states)
+// South: ~21.3° N (Digha / Bay of Bengal / Sundarbans)
+// North: ~27.35° N (Darjeeling / Kalimpong / Siliguri)
+// West: ~85.70° E (Purulia / Jharkhand border)
+// East: ~89.90° E (Alipurduar / Cooch Behar border)
+const BENGAL_BOUNDS = L.latLngBounds(
+  [21.3, 85.7], // Southwest corner of West Bengal
+  [27.35, 89.9] // Northeast corner of West Bengal
+);
+const MIN_BENGAL_ZOOM = 7;
+const MAX_ZOOM = 18;
+
 interface LiveOrderRealMapProps {
   warehouse: {
     lat: number;
@@ -64,6 +77,7 @@ export const LiveOrderRealMap: React.FC<LiveOrderRealMapProps> = ({
   const routeLineRef = useRef<L.Polyline | null>(null);
   const routeGlowRef = useRef<L.Polyline | null>(null);
   const riderIconRef = useRef<L.DivIcon | null>(null);
+  const [currentZoom, setCurrentZoom] = useState<number>(13);
 
   // Initialize Leaflet Map once
   useEffect(() => {
@@ -76,21 +90,28 @@ export const LiveOrderRealMap: React.FC<LiveOrderRealMapProps> = ({
       container.innerHTML = '';
     }
 
-    // Initialize Map with non-animating bounds
+    // Initialize Map with non-animating bounds restricted strictly to West Bengal
     const map = L.map(container, {
       center: [(warehouse.lat + destination.lat) / 2, (warehouse.lng + destination.lng) / 2],
       zoom: 13,
+      minZoom: MIN_BENGAL_ZOOM, // Can only zoom out till Bengal state level (never out to all of India or world)
+      maxZoom: MAX_ZOOM,
+      maxBounds: BENGAL_BOUNDS, // Hard locks panning to West Bengal territory only
+      maxBoundsViscosity: 1.0,  // 1.0 = solid barrier, map springs back and will not pan into other states
       zoomControl: false,
       attributionControl: false,
       scrollWheelZoom: false
     });
 
-    // Clean OpenStreetMap Tile Layer (High reliability, no API key required, zero watermark)
+    // CartoDB Voyager Tile Layer (Clean Uber / Apple Maps aesthetic, crisp street labels, free, zero keys)
     const tileLayer = L.tileLayer(
-      'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+      'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
       {
-        maxZoom: 19,
-        attribution: '&copy; OpenStreetMap contributors'
+        subdomains: 'abcd',
+        minZoom: MIN_BENGAL_ZOOM,
+        maxZoom: MAX_ZOOM,
+        bounds: BENGAL_BOUNDS,
+        attribution: '&copy; OpenStreetMap contributors &copy; CARTO'
       }
     ).addTo(map);
 
@@ -218,6 +239,12 @@ export const LiveOrderRealMap: React.FC<LiveOrderRealMapProps> = ({
       [destination.lat, destination.lng]
     ]);
     map.fitBounds(bounds, { padding: [35, 35], maxZoom: 16, animate: false });
+    setCurrentZoom(map.getZoom());
+
+    // Track zoom level changes to strictly enforce West Bengal boundaries
+    map.on('zoomend', () => {
+      setCurrentZoom(map.getZoom());
+    });
 
     mapInstanceRef.current = map;
 
@@ -351,7 +378,10 @@ export const LiveOrderRealMap: React.FC<LiveOrderRealMapProps> = ({
   const handleZoomIn = () => {
     if (mapInstanceRef.current) {
       try {
-        mapInstanceRef.current.zoomIn();
+        const cur = mapInstanceRef.current.getZoom();
+        if (cur < MAX_ZOOM) {
+          mapInstanceRef.current.zoomIn();
+        }
       } catch {
         // ignore
       }
@@ -361,7 +391,10 @@ export const LiveOrderRealMap: React.FC<LiveOrderRealMapProps> = ({
   const handleZoomOut = () => {
     if (mapInstanceRef.current) {
       try {
-        mapInstanceRef.current.zoomOut();
+        const cur = mapInstanceRef.current.getZoom();
+        if (cur > MIN_BENGAL_ZOOM) {
+          mapInstanceRef.current.zoomOut();
+        }
       } catch {
         // ignore
       }
@@ -401,6 +434,15 @@ export const LiveOrderRealMap: React.FC<LiveOrderRealMapProps> = ({
         )}
       </div>
 
+      {/* Bengal State Boundary Notice when fully zoomed out */}
+      {currentZoom <= MIN_BENGAL_ZOOM && (
+        <div className="absolute top-3 right-3 z-10 pointer-events-none animate-fade-in">
+          <div className="bg-slate-900/90 text-white backdrop-blur-md px-2.5 py-1 rounded-lg text-[11px] font-bold shadow-sm border border-slate-700/80">
+            West Bengal Boundary
+          </div>
+        </div>
+      )}
+
       {/* Floating Recenter & Zoom Controls */}
       <div className="absolute bottom-3 right-3 z-10 flex flex-col gap-1.5">
         <button
@@ -413,15 +455,27 @@ export const LiveOrderRealMap: React.FC<LiveOrderRealMapProps> = ({
         </button>
         <button
           onClick={handleZoomIn}
+          disabled={currentZoom >= MAX_ZOOM}
           aria-label="Zoom in"
-          className="w-8 h-8 rounded-xl bg-white/95 backdrop-blur-md shadow-sm hover:bg-white text-slate-700 flex items-center justify-center transition-colors cursor-pointer"
+          className={`w-8 h-8 rounded-xl bg-white/95 backdrop-blur-md shadow-sm text-slate-700 flex items-center justify-center transition-colors ${
+            currentZoom >= MAX_ZOOM ? 'opacity-40 cursor-not-allowed' : 'hover:bg-white cursor-pointer'
+          }`}
+          title={currentZoom >= MAX_ZOOM ? 'Maximum zoom level reached' : 'Zoom in'}
         >
           <ZoomIn className="w-4 h-4" />
         </button>
         <button
           onClick={handleZoomOut}
+          disabled={currentZoom <= MIN_BENGAL_ZOOM}
           aria-label="Zoom out"
-          className="w-8 h-8 rounded-xl bg-white/95 backdrop-blur-md shadow-sm hover:bg-white text-slate-700 flex items-center justify-center transition-colors cursor-pointer"
+          className={`w-8 h-8 rounded-xl bg-white/95 backdrop-blur-md shadow-sm text-slate-700 flex items-center justify-center transition-colors ${
+            currentZoom <= MIN_BENGAL_ZOOM ? 'opacity-40 cursor-not-allowed' : 'hover:bg-white cursor-pointer'
+          }`}
+          title={
+            currentZoom <= MIN_BENGAL_ZOOM
+              ? 'Minimum zoom reached (West Bengal state boundary - cannot zoom out to other states)'
+              : 'Zoom out'
+          }
         >
           <ZoomOut className="w-4 h-4" />
         </button>

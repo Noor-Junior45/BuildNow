@@ -169,5 +169,10 @@
   animation-play-state: paused;
 }
 
+/* Ensure clean map presentation with zero watermark or attribution overlay */
+.leaflet-control-attribution {
+  display: none !important;
+}
+
 
 

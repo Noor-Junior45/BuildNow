@@ -273,7 +273,13 @@ export const TechniciansPage: React.FC<TechniciansPageProps> = ({
     if (onSelectTechnician) {
       onSelectTechnician(tech);
     } else {
-      navigate(`/technicians/${encodeURIComponent(tech.id)}`);
+      const targetId =
+        tech.id && tech.id.trim().length > 0
+          ? tech.id.trim()
+          : `tech-${(tech.name || 'specialist').trim().toLowerCase().replace(/[^a-z0-9]+/g, '-')}`;
+      navigate(`/technicians/${encodeURIComponent(targetId)}`, {
+        state: { technician: tech }
+      });
     }
   };
 
