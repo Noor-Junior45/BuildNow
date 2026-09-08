@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import {
   Mail,
@@ -8,7 +8,8 @@ import {
   CheckCircle2,
   KeyRound,
   LogIn,
-  UserPlus
+  UserPlus,
+  Phone
 } from 'lucide-react';
 import { Capacitor } from '@capacitor/core';
 import { supabase } from '../lib/supabaseClient';
@@ -25,6 +26,50 @@ interface LoginPageProps {
 
 type AuthMode = 'signin' | 'signup' | 'forgot';
 
+// Helper: If user or browser autofill entered an 11-digit number starting with 0, don't count the first zero
+const cleanAutofillPhone = (input: string): string => {
+  const trimmed = input.trim();
+  if (trimmed.includes('@')) return input;
+
+  const digits = trimmed.replace(/[^0-9]/g, '');
+  // Only if total digits is 11 AND starts with '0'
+  if (digits.length === 11 && digits.startsWith('0')) {
+    return digits.slice(1);
+  }
+  return input;
+};
+
+// Helper: Normalize phone to E.164 (defaulting to +91 for 10-digit Indian numbers)
+const normalizePhone = (input: string): string => {
+  const trimmed = input.trim();
+  if (trimmed.startsWith('+')) {
+    return trimmed.replace(/[^0-9+]/g, '');
+  }
+  let digits = trimmed.replace(/[^0-9]/g, '');
+
+  // If 11 digits and starts with 0 (autofill adding 0 in starting), don't count the first zero
+  if (digits.length === 11 && digits.startsWith('0')) {
+    digits = digits.slice(1);
+  }
+
+  if (digits.length === 10) {
+    return `+91${digits}`;
+  }
+  if (digits.length === 12 && digits.startsWith('91')) {
+    return `+${digits}`;
+  }
+  return `+${digits}`;
+};
+
+// Helper: Detect if user entered a phone number rather than an email
+const isPhoneInput = (input: string): boolean => {
+  const trimmed = input.trim();
+  if (!trimmed) return false;
+  if (trimmed.includes('@')) return false;
+  const digits = trimmed.replace(/[^0-9]/g, '');
+  return digits.length >= 7;
+};
+
 export const LoginPage: React.FC<LoginPageProps> = ({ onAuthSuccess }) => {
   const navigate = useNavigate();
 
@@ -32,12 +77,21 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onAuthSuccess }) => {
   const [mode, setMode] = useState<AuthMode>('signin');
 
   // Input states
-  const [email, setEmail] = useState('');
+  const [identifier, setIdentifier] = useState(''); // Holds email or phone in signin
+  const [email, setEmail] = useState(''); // Used in signup/forgot
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [otpCode, setOtpCode] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
+  // Progressive field reveal states
+  const [showSecondField, setShowSecondField] = useState(false);
+  const [otpSent, setOtpSent] = useState(false);
+
+  // Timers
   const [magicLinkCooldown, setMagicLinkCooldown] = useState(0);
+  const [otpCooldown, setOtpCooldown] = useState(0);
 
   // Feedback states
   const [isLoading, setIsLoading] = useState(false);
@@ -45,6 +99,15 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onAuthSuccess }) => {
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [infoMessage, setInfoMessage] = useState<string | null>(null);
+
+  const secondInputRef = useRef<HTMLInputElement>(null);
+
+  // Focus second input when revealed
+  useEffect(() => {
+    if (showSecondField && secondInputRef.current) {
+      secondInputRef.current.focus();
+    }
+  }, [showSecondField]);
 
   // Magic Link cooldown timer
   useEffect(() => {
@@ -56,6 +119,17 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onAuthSuccess }) => {
     }
     return () => clearInterval(interval);
   }, [magicLinkCooldown]);
+
+  // OTP cooldown timer
+  useEffect(() => {
+    let interval: ReturnType<typeof setInterval>;
+    if (otpCooldown > 0) {
+      interval = setInterval(() => {
+        setOtpCooldown((prev) => prev - 1);
+      }, 1000);
+    }
+    return () => clearInterval(interval);
+  }, [otpCooldown]);
 
   const resetMessages = () => {
     setError(null);
@@ -79,12 +153,106 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onAuthSuccess }) => {
     }
   };
 
-  // --- 2. PASSWORD SIGN IN ---
+  // --- 2. SEND PHONE OTP VIA SUPABASE ---
+  const handleSendPhoneOtp = async () => {
+    resetMessages();
+    const phone = normalizePhone(identifier);
+    let rawDigits = identifier.replace(/[^0-9]/g, '');
+    // If autofill added 0 at start making it 11 digits, don't count first zero
+    if (rawDigits.length === 11 && rawDigits.startsWith('0')) {
+      rawDigits = rawDigits.slice(1);
+    }
+
+    if (rawDigits.length < 10) {
+      setError('Please enter a valid 10-digit mobile number.');
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const { error: otpError } = await supabase.auth.signInWithOtp({
+        phone: phone,
+      });
+
+      if (otpError) {
+        if (otpError.message?.toLowerCase().includes('unsupported') || otpError.message?.toLowerCase().includes('provider')) {
+          setError(`Supabase SMS provider error: ${otpError.message}. Please make sure one of the 4 SMS providers is configured in your Supabase Auth settings.`);
+        } else {
+          setError(otpError.message || 'Failed to send OTP to mobile number. Please try again.');
+        }
+      } else {
+        setOtpSent(true);
+        setShowSecondField(true);
+        setOtpCooldown(60);
+        setInfoMessage(`OTP sent to ${phone}. Enter the 6-digit code below.`);
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to send OTP.';
+      setError(msg);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // --- 3. VERIFY PHONE OTP VIA SUPABASE ---
+  const handleVerifyPhoneOtp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    resetMessages();
+    const phone = normalizePhone(identifier);
+    const cleanOtp = otpCode.trim();
+
+    if (!cleanOtp || cleanOtp.length < 4) {
+      setError('Please enter the OTP sent to your mobile number.');
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const { data, error: verifyError } = await supabase.auth.verifyOtp({
+        phone: phone,
+        token: cleanOtp,
+        type: 'sms',
+      });
+
+      if (verifyError) {
+        setError(verifyError.message || 'Invalid or expired OTP. Please try again.');
+      } else if (data.user) {
+        const cloudProf = await fetchUserProfileFromSupabase(data.user.id);
+        const userFullName =
+          cloudProf?.name ||
+          data.user.user_metadata?.full_name ||
+          `Giriraj Member (${phone.slice(-4)})`;
+        const finalPhone = cloudProf?.phone || data.user.phone || phone;
+        const finalEmail = cloudProf?.email || data.user.email || '';
+
+        onAuthSuccess(finalPhone, userFullName, finalEmail);
+
+        if (finalEmail) {
+          sendLoginNotificationEmail({
+            email: finalEmail,
+            name: userFullName,
+            userId: data.user.id,
+            loginMethod: 'Mobile Number & Supabase SMS OTP',
+            force: false,
+          }).catch((e) => console.debug('[Security Alert Note]:', e));
+        }
+
+        navigate('/');
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to verify OTP.';
+      setError(msg);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // --- 4. PASSWORD SIGN IN (EMAIL) ---
   const handlePasswordLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     resetMessages();
 
-    const cleanEmail = email.trim().toLowerCase();
+    const cleanEmail = identifier.trim().toLowerCase();
     if (!cleanEmail || !cleanEmail.includes('@') || !cleanEmail.includes('.')) {
       setError('Please enter a valid email address.');
       return;
@@ -131,7 +299,55 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onAuthSuccess }) => {
     }
   };
 
-  // --- 3. PASSWORD SIGN UP ---
+  // --- 5. HYBRID PRIMARY SUBMIT HANDLER ---
+  const handlePrimarySubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    resetMessages();
+
+    // If identifier was autofilled with 11 digits starting with 0, clean the leading zero
+    let cleanId = identifier.trim();
+    if (!cleanId.includes('@')) {
+      const digits = cleanId.replace(/[^0-9]/g, '');
+      if (digits.length === 11 && digits.startsWith('0')) {
+        cleanId = digits.slice(1);
+        setIdentifier(cleanId);
+      }
+    }
+
+    const isPhone = isPhoneInput(cleanId);
+
+    if (isPhone) {
+      // Mobile Number Flow
+      if (!otpSent || !showSecondField) {
+        await handleSendPhoneOtp();
+      } else {
+        await handleVerifyPhoneOtp(e);
+      }
+    } else {
+      // Email Flow
+      const cleanEmail = identifier.trim().toLowerCase();
+      if (!cleanEmail || !cleanEmail.includes('@') || !cleanEmail.includes('.')) {
+        setError('Please enter a valid email address or 10-digit mobile number.');
+        return;
+      }
+
+      if (!showSecondField) {
+        // Reveal password input line
+        setShowSecondField(true);
+        return;
+      }
+
+      // Password input is visible -> submit login
+      if (!password) {
+        setError('Please enter your password.');
+        return;
+      }
+
+      await handlePasswordLogin(e);
+    }
+  };
+
+  // --- 6. PASSWORD SIGN UP ---
   const handlePasswordSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
     resetMessages();
@@ -193,7 +409,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onAuthSuccess }) => {
     }
   };
 
-  // --- 4. FORGOT PASSWORD ---
+  // --- 7. FORGOT PASSWORD ---
   const handleForgotPassword = async (e: React.FormEvent) => {
     e.preventDefault();
     resetMessages();
@@ -228,13 +444,13 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onAuthSuccess }) => {
     }
   };
 
-  // --- 5. MAGIC LINK (1-CLICK PASSWORDLESS) ---
+  // --- 8. MAGIC LINK (1-CLICK PASSWORDLESS) ---
   const handleSendMagicLink = async () => {
     resetMessages();
 
-    const cleanEmail = email.trim().toLowerCase();
+    const cleanEmail = (identifier || email).trim().toLowerCase();
     if (!cleanEmail || !cleanEmail.includes('@') || !cleanEmail.includes('.')) {
-      setError('Please enter your email above to receive a magic link.');
+      setError('Please enter a valid email address above to receive a magic link.');
       return;
     }
 
@@ -267,6 +483,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onAuthSuccess }) => {
   };
 
   const isAnyLoading = isLoading || isMagicLoading || isGoogleLoading;
+  const isPhone = isPhoneInput(identifier);
 
   return (
     <div className="min-h-screen bg-white flex flex-col justify-center items-center px-4 py-8 sm:py-12">
@@ -318,77 +535,181 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onAuthSuccess }) => {
         {/* Authentication Forms */}
         <div className="space-y-4">
           
-          {/* 1. SIGN IN MODE */}
+          {/* 1. SIGN IN MODE (HYBRID EMAIL & MOBILE OTP) */}
           {mode === 'signin' && (
-            <form onSubmit={handlePasswordLogin} className="space-y-4">
+            <form onSubmit={handlePrimarySubmit} className="space-y-4">
               <div>
                 <label className="block text-xs font-bold text-slate-800 tracking-wider uppercase mb-1">
-                  EMAIL ADDRESS
+                  EMAIL/PHONE
                 </label>
                 <div className="flex items-center border-b border-slate-300 focus-within:border-slate-800 transition-colors pb-1">
-                  <Mail className="w-5 h-5 text-slate-400 shrink-0 mr-2.5" />
+                  {isPhone ? (
+                    <Phone className="w-5 h-5 text-slate-400 shrink-0 mr-2.5" />
+                  ) : (
+                    <Mail className="w-5 h-5 text-slate-400 shrink-0 mr-2.5" />
+                  )}
                   <input
-                    type="email"
-                    placeholder="your@email.com"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    className="w-full bg-transparent py-2 text-sm font-medium text-slate-900 placeholder:text-slate-400 focus:outline-none"
-                    required
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-slate-800 tracking-wider uppercase mb-1">
-                  PASSWORD
-                </label>
-                <div className="flex items-center border-b border-slate-300 focus-within:border-slate-800 transition-colors pb-1">
-                  <Lock className="w-5 h-5 text-slate-400 shrink-0 mr-2.5" />
-                  <input
-                    type={showPassword ? 'text' : 'password'}
-                    placeholder="••••••••"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    className="w-full bg-transparent py-2 text-sm font-medium text-slate-900 placeholder:text-slate-400 focus:outline-none"
-                    required
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="p-1 text-slate-400 hover:text-slate-600 transition-colors cursor-pointer shrink-0"
-                    tabIndex={-1}
-                  >
-                    {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                  </button>
-                </div>
-                
-                {/* Forgot password moved below the password horizontal line */}
-                <div className="flex justify-end pt-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setMode('forgot');
+                    type={isPhone ? 'tel' : 'text'}
+                    autoComplete="username tel email"
+                    placeholder="your@email.com or 10-digit mobile"
+                    value={identifier}
+                    onChange={(e) => {
+                      let val = e.target.value;
+                      // When autofill adds 0 at the start of an 11-digit number, don't count the first zero
+                      if (!val.includes('@')) {
+                        const digits = val.replace(/[^0-9]/g, '');
+                        if (digits.length === 11 && digits.startsWith('0')) {
+                          val = digits.slice(1);
+                        }
+                      }
+                      setIdentifier(val);
                       resetMessages();
+                      if (otpSent && !isPhoneInput(val)) {
+                        setOtpSent(false);
+                        setShowSecondField(false);
+                      }
                     }}
-                    className="text-xs font-semibold text-slate-500 hover:text-slate-800 transition-colors cursor-pointer"
-                  >
-                    Forgot password?
-                  </button>
+                    onPaste={(e) => {
+                      const pasted = e.clipboardData.getData('text');
+                      if (pasted && !pasted.includes('@')) {
+                        const digits = pasted.replace(/[^0-9]/g, '');
+                        if (digits.length === 11 && digits.startsWith('0')) {
+                          e.preventDefault();
+                          const cleaned = digits.slice(1);
+                          setIdentifier(cleaned);
+                          resetMessages();
+                        }
+                      }
+                    }}
+                    className="w-full bg-transparent py-2 text-sm font-medium text-slate-900 placeholder:text-slate-400 focus:outline-none"
+                    required
+                  />
                 </div>
               </div>
 
-              {/* Primary Login Button (kept yellow) */}
+              {/* Refined Second Input: Appears according to user email or phone */}
+              <div className={showSecondField ? 'space-y-1 block animate-in fade-in duration-200' : 'hidden'}>
+                <label className="block text-xs font-bold text-slate-800 tracking-wider uppercase mb-1">
+                  PASSWORD/OTP
+                </label>
+
+                {isPhone ? (
+                  /* Mobile OTP Fill Functions */
+                  <div>
+                    <div className="flex items-center border-b border-slate-300 focus-within:border-slate-800 transition-colors pb-1">
+                      <KeyRound className="w-5 h-5 text-slate-400 shrink-0 mr-2.5" />
+                      <input
+                        ref={secondInputRef}
+                        type="text"
+                        inputMode="numeric"
+                        autoComplete="one-time-code"
+                        pattern="[0-9]*"
+                        maxLength={6}
+                        placeholder="Enter 6-digit OTP"
+                        value={otpCode}
+                        onChange={(e) => setOtpCode(e.target.value.replace(/[^0-9]/g, ''))}
+                        className="w-full bg-transparent py-2 text-sm font-semibold tracking-widest text-slate-900 placeholder:text-slate-400 focus:outline-none"
+                        required={showSecondField && isPhone}
+                      />
+                    </div>
+
+                    <div className="flex justify-between items-center pt-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setOtpSent(false);
+                          setShowSecondField(false);
+                          setOtpCode('');
+                          resetMessages();
+                        }}
+                        className="text-xs font-semibold text-slate-500 hover:text-slate-800 transition-colors cursor-pointer"
+                      >
+                        Change number
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={handleSendPhoneOtp}
+                        disabled={otpCooldown > 0 || isLoading}
+                        className="text-xs font-bold text-amber-700 hover:text-amber-800 disabled:text-slate-400 cursor-pointer"
+                      >
+                        {otpCooldown > 0 ? `Resend OTP (${otpCooldown}s)` : 'Resend OTP'}
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  /* Password Input for Email */
+                  <div>
+                    <div className="flex items-center border-b border-slate-300 focus-within:border-slate-800 transition-colors pb-1">
+                      <Lock className="w-5 h-5 text-slate-400 shrink-0 mr-2.5" />
+                      <input
+                        ref={secondInputRef}
+                        type={showPassword ? 'text' : 'password'}
+                        placeholder="••••••••"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        className="w-full bg-transparent py-2 text-sm font-medium text-slate-900 placeholder:text-slate-400 focus:outline-none"
+                        required={showSecondField && !isPhone}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="p-1 text-slate-400 hover:text-slate-600 transition-colors cursor-pointer shrink-0"
+                        tabIndex={-1}
+                      >
+                        {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                      </button>
+                    </div>
+
+                    <div className="flex justify-between items-center pt-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowSecondField(false);
+                          setPassword('');
+                          resetMessages();
+                        }}
+                        className="text-xs font-semibold text-slate-500 hover:text-slate-800 transition-colors cursor-pointer"
+                      >
+                        Change email
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setMode('forgot');
+                          resetMessages();
+                        }}
+                        className="text-xs font-semibold text-slate-500 hover:text-slate-800 transition-colors cursor-pointer"
+                      >
+                        Forgot password?
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Primary Action Button */}
               <button
                 type="submit"
                 disabled={isAnyLoading}
                 className="w-full py-3 px-4 rounded-2xl bg-amber-400 hover:bg-yellow-400 text-slate-950 font-black text-sm transition-all flex items-center justify-center gap-2 cursor-pointer shadow-xs active:scale-[0.99] disabled:opacity-50 mt-2"
               >
                 {isLoading ? (
-                  <span className="flex items-center gap-2">Signing In...</span>
+                  <span className="flex items-center gap-2">
+                    {isPhone
+                      ? (otpSent ? 'Verifying OTP...' : 'Sending OTP...')
+                      : 'Signing In...'}
+                  </span>
+                ) : !showSecondField ? (
+                  <>
+                    <LogIn className="w-4 h-4" />
+                    <span>{isPhone ? 'Login / OTP' : 'Login / Password'}</span>
+                  </>
                 ) : (
                   <>
                     <LogIn className="w-4 h-4" />
-                    <span>Login</span>
+                    <span>{isPhone ? 'Verify OTP & Login' : 'Login'}</span>
                   </>
                 )}
               </button>
@@ -414,7 +735,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onAuthSuccess }) => {
             <form onSubmit={handlePasswordSignUp} className="space-y-4">
               <div>
                 <label className="block text-xs font-bold text-slate-800 tracking-wider uppercase mb-1">
-                  EMAIL ADDRESS
+                  EMAIL/PHONE
                 </label>
                 <div className="flex items-center border-b border-slate-300 focus-within:border-slate-800 transition-colors pb-1">
                   <Mail className="w-5 h-5 text-slate-400 shrink-0 mr-2.5" />
