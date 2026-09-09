@@ -165,8 +165,14 @@ export interface Order {
   discountAmount?: number;
   couponCode?: string | null;
   totalAmount: number;
+  total?: number;
+  finalAmount?: number;
   paymentMethod: 'cod' | 'upi' | 'card';
   paymentStatus: 'paid' | 'pending';
+  paymentId?: string;
+  razorpayPaymentId?: string;
+  razorpayOrderId?: string;
+  razorpaySignature?: string;
   status: OrderStatus;
   createdAt: string;
   placed_at?: string;

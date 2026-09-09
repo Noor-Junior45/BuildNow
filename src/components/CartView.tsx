@@ -63,6 +63,7 @@ import {
   fetchSavedItemsFromSupabase,
   SavedItemRecord
 } from '../services/cartService';
+import { launchRazorpayCheckout } from '../services/razorpayService';
 import confetti from 'canvas-confetti';
 
 interface CartViewProps {
@@ -490,6 +491,33 @@ export const CartView: React.FC<CartViewProps> = ({
     const orderUuid = generateUUID();
     const humanOrderNumber = `GP-${Math.floor(100000 + Math.random() * 900000)}`;
 
+    let paymentId: string | undefined = undefined;
+    let razorpayOrderId: string | undefined = undefined;
+    let razorpaySignature: string | undefined = undefined;
+
+    // If online payment (UPI or Card), launch Razorpay gateway checkout
+    if (paymentMethod === 'upi' || paymentMethod === 'card') {
+      try {
+        const paymentRes = await launchRazorpayCheckout({
+          amount: finalTotalAmount,
+          customerName: recipientName,
+          customerPhone: resolvedPhone.replace(/[^0-9]/g, '').slice(-10),
+          customerEmail: recipientEmail,
+          description: `Order ${humanOrderNumber} (${orderItems.length} items)`
+        });
+        paymentId = paymentRes.paymentId;
+        razorpayOrderId = paymentRes.orderId;
+        razorpaySignature = paymentRes.signature;
+      } catch (payErr: any) {
+        hapticError();
+        setIsSubmitting(false);
+        setCheckoutError(
+          payErr?.message || 'Payment was cancelled or could not be completed. Please try again or select Cash on Delivery.'
+        );
+        return;
+      }
+    }
+
     const newOrder: Order = {
       id: orderUuid,
       trackingNumber: humanOrderNumber,
@@ -521,6 +549,10 @@ export const CartView: React.FC<CartViewProps> = ({
       totalAmount: finalTotalAmount,
       paymentMethod,
       paymentStatus: paymentMethod === 'cod' ? 'pending' : 'paid',
+      paymentId,
+      razorpayPaymentId: paymentId,
+      razorpayOrderId,
+      razorpaySignature,
       status: 'pending',
       createdAt: new Date().toISOString(),
       estimatedDeliveryTimestamp: Date.now() + currentArea.deliveryMinutes * 60 * 1000,
@@ -1437,7 +1469,12 @@ export const CartView: React.FC<CartViewProps> = ({
                     <Smartphone className="w-4 h-4" />
                   </div>
                   <div className="min-w-0">
-                    <span className="text-xs sm:text-sm font-bold text-slate-900 block">UPI Instant Pay</span>
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-xs sm:text-sm font-bold text-slate-900 block">UPI Instant Pay</span>
+                      <span className="text-[8px] font-black uppercase px-1.5 py-0.2 rounded bg-blue-100 text-blue-800 border border-blue-200">
+                        Razorpay
+                      </span>
+                    </div>
                     <p className="text-[11px] text-slate-500 truncate mt-0.5">
                       Google Pay, PhonePe, Paytm, BHIM &amp; QR
                     </p>
@@ -1467,7 +1504,12 @@ export const CartView: React.FC<CartViewProps> = ({
                     <CreditCard className="w-4 h-4" />
                   </div>
                   <div className="min-w-0">
-                    <span className="text-xs sm:text-sm font-bold text-slate-900 block">Credit / Debit Card &amp; Net Banking</span>
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-xs sm:text-sm font-bold text-slate-900 block">Cards &amp; Net Banking</span>
+                      <span className="text-[8px] font-black uppercase px-1.5 py-0.2 rounded bg-purple-100 text-purple-800 border border-purple-200">
+                        Razorpay
+                      </span>
+                    </div>
                     <p className="text-[11px] text-slate-500 truncate mt-0.5">
                       Visa, MasterCard, RuPay, Netbanking
                     </p>

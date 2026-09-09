@@ -15,7 +15,8 @@ import {
   Clock,
   FileText,
   Lock,
-  Heart
+  Heart,
+  RotateCcw
 } from 'lucide-react';
 import { Order, SavedAddress, UserProfile, CartItem, Product, WalletTransaction } from '../types';
 import { OrderHistoryView } from './OrderHistoryView';
@@ -41,6 +42,7 @@ import { HelpCenterSubPage } from './profile/HelpCenterSubPage';
 import { NotificationsSubPage } from './profile/NotificationsSubPage';
 import { PrivacyPolicySubPage } from './profile/PrivacyPolicySubPage';
 import { TermsOfServiceSubPage } from './profile/TermsOfServiceSubPage';
+import { RefundPolicySubPage } from './profile/RefundPolicySubPage';
 import { EditProfileModal } from './profile/EditProfileModal';
 
 interface ProfileViewProps {
@@ -76,9 +78,9 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
   onAddToCart,
   allProducts
 }) => {
-  // Current active sub-page view: 'main' | 'orders' | 'addresses' | 'payments' | 'wallet' | 'services' | 'membership' | 'help' | 'notifications' | 'privacy' | 'terms' | 'favorites'
+  // Current active sub-page view: 'main' | 'orders' | 'addresses' | 'payments' | 'wallet' | 'services' | 'membership' | 'help' | 'notifications' | 'privacy' | 'terms' | 'favorites' | 'refund-policy'
   const [subPage, setSubPage] = useState<
-    'main' | 'orders' | 'addresses' | 'payments' | 'wallet' | 'services' | 'membership' | 'help' | 'notifications' | 'privacy' | 'terms' | 'favorites'
+    'main' | 'orders' | 'addresses' | 'payments' | 'wallet' | 'services' | 'membership' | 'help' | 'notifications' | 'privacy' | 'terms' | 'favorites' | 'refund-policy'
   >('main');
 
   // Favorites state
@@ -242,6 +244,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
       <div className="min-h-screen bg-slate-50 text-slate-900 pb-20">
         <OrderHistoryView
           orders={sortedOrders}
+          userProfile={userProfile}
           onOpenShop={onOpenShop}
           onBack={() => setSubPage('main')}
         />
@@ -375,6 +378,18 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
         onToggleFavorite={handleToggleFavorite}
         onAddToCart={onAddToCart}
         onReorder={onReorder}
+      />
+    );
+  }
+
+  // -------------------------------------------------------------
+  // SUB-PAGE 11: REFUND POLICY (MANAGED BY RAZORPAY)
+  // -------------------------------------------------------------
+  if (subPage === 'refund-policy') {
+    return (
+      <RefundPolicySubPage
+        onBack={() => setSubPage('main')}
+        onContactSupport={() => setSubPage('help')}
       />
     );
   }
@@ -673,6 +688,29 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
               </div>
               <div>
                 <p className="text-base sm:text-lg font-normal text-slate-800">Terms of Service</p>
+              </div>
+            </div>
+            <ChevronRight className="w-5 h-5 text-slate-400 group-hover:text-slate-600 transition-colors" />
+          </button>
+
+          {/* 10. Refund Policy (Managed by Razorpay) */}
+          <button
+            id="btn-profile-refund-policy"
+            onClick={() => setSubPage('refund-policy')}
+            className="w-full p-4 sm:p-4.5 flex items-center justify-between hover:bg-slate-50/80 transition-colors text-left cursor-pointer group"
+          >
+            <div className="flex items-center gap-3.5 sm:gap-4">
+              <div className="w-10 h-10 rounded-2xl bg-emerald-100 border border-emerald-200 text-emerald-600 flex items-center justify-center shrink-0 shadow-2xs group-hover:scale-105 transition-transform">
+                <RotateCcw className="w-5 h-5" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <p className="text-base sm:text-lg font-normal text-slate-800">Refund Policy</p>
+                  <span className="text-[10px] font-bold text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-full border border-emerald-200">
+                    Razorpay
+                  </span>
+                </div>
+                <p className="text-xs text-slate-500 font-normal">Direct-to-source instant &amp; bank clearing</p>
               </div>
             </div>
             <ChevronRight className="w-5 h-5 text-slate-400 group-hover:text-slate-600 transition-colors" />

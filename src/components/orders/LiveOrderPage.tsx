@@ -11,11 +11,19 @@ import {
   Warehouse,
   Home,
   CheckCircle2,
-  ShoppingBag
+  ShoppingBag,
+  XCircle,
+  AlertCircle,
+  CreditCard,
+  Banknote,
+  Loader2
 } from 'lucide-react';
 import { Order } from '../../types';
 import { KOLKATA_AREAS } from '../../data/kolkataAreas';
 import { LiveOrderRealMap } from './LiveOrderRealMap';
+import { updateOrderStatusInFirestore, saveUserProfile } from '../../services/supabaseService';
+import { initiateRazorpayRefund } from '../../services/razorpayService';
+import { showToast } from '../../utils/toast';
 
 // Giriraj Power Kasba Central Warehouse Exact Coordinates
 const WAREHOUSE_LOCATION = {
@@ -263,12 +271,117 @@ export const LiveOrderPage: React.FC<LiveOrderPageProps> = ({
     updatedAt?: string;
   } | null>(initialRiderLocation);
 
+  // Cancellation State
+  const [showCancelModal, setShowCancelModal] = useState(false);
+  const [isCancelling, setIsCancelling] = useState(false);
+  const [cancelReason, setCancelReason] = useState('Placed by mistake');
+  const [otherCancelReason, setOtherCancelReason] = useState('');
+  const [currentTime, setCurrentTime] = useState(Date.now());
+
+  // Live timer for 2-minute cancellation countdown
+  useEffect(() => {
+    const timer = setInterval(() => setCurrentTime(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
   // Synchronize when initial order data updates
   useEffect(() => {
     if (initialRiderLocation) {
       setLiveRiderLocation(initialRiderLocation);
     }
   }, [initialRiderLocation]);
+
+  // 2-Minute Cancellation Policy Checker
+  const cancellationState = useMemo(() => {
+    if (!order) return { canCancel: false, remainingSeconds: 0, formattedCountdown: '0:00', reason: 'No order' };
+
+    const st = (order.status || 'pending').toLowerCase();
+    const forbiddenStatuses = ['packing', 'packed', 'shipped', 'out_for_delivery', 'near_destination', 'delivered', 'cancelled', 'failed'];
+    if (forbiddenStatuses.includes(st)) {
+      let reason = 'Order is already being processed';
+      if (st === 'cancelled') reason = 'Order is already cancelled';
+      else if (st === 'delivered') reason = 'Order is already delivered';
+      else if (st === 'packing' || st === 'packed') reason = 'Order is currently being packed';
+      else if (st === 'out_for_delivery' || st === 'shipped' || st === 'near_destination') reason = 'Order is already out for delivery';
+      return { canCancel: false, remainingSeconds: 0, formattedCountdown: '0:00', reason };
+    }
+
+    const placedTimeStr = order.placed_at || order.placedAt || order.createdAt;
+    const placedTime = placedTimeStr ? new Date(placedTimeStr).getTime() : 0;
+    if (!placedTime || isNaN(placedTime)) {
+      return { canCancel: false, remainingSeconds: 0, formattedCountdown: '0:00', reason: 'Invalid order time' };
+    }
+
+    const elapsedMs = currentTime - placedTime;
+    const twoMinutesMs = 2 * 60 * 1000;
+    const remainingMs = twoMinutesMs - elapsedMs;
+    const remainingSeconds = Math.max(0, Math.ceil(remainingMs / 1000));
+
+    if (remainingSeconds <= 0) {
+      return { canCancel: false, remainingSeconds: 0, formattedCountdown: '0:00', reason: '2-minute cancellation window expired' };
+    }
+
+    const mins = Math.floor(remainingSeconds / 60);
+    const secs = remainingSeconds % 60;
+
+    return {
+      canCancel: true,
+      remainingSeconds,
+      formattedCountdown: `${mins}:${secs.toString().padStart(2, '0')}`,
+      reason: ''
+    };
+  }, [order, currentTime]);
+
+  const handleConfirmCancelOrder = async () => {
+    if (!order) return;
+    try {
+      setIsCancelling(true);
+      if (!cancellationState.canCancel) {
+        showToast(cancellationState.reason || 'This order cannot be cancelled anymore as per policy.', 'error');
+        setShowCancelModal(false);
+        return;
+      }
+
+      const success = await updateOrderStatusInFirestore(order.id, 'cancelled');
+      if (!success) {
+        throw new Error('Failed to update status');
+      }
+
+      const isPaid = order.paymentMethod !== 'cod' || order.paymentStatus === 'paid';
+      const refundAmount = order.totalAmount ?? order.total ?? (order as any).finalAmount ?? 0;
+
+      if (isPaid && refundAmount > 0) {
+        try {
+          const paymentId = (order as any).paymentId || (order as any).razorpay_payment_id || order.id;
+          const finalReason = cancelReason === 'Other reason' && otherCancelReason.trim() ? otherCancelReason.trim() : cancelReason;
+          const refundRes = await initiateRazorpayRefund(
+            paymentId,
+            refundAmount,
+            order.id,
+            finalReason || 'Customer requested 2-minute cancellation'
+          );
+          showToast(
+            `Order cancelled. 100% refund of ₹${refundAmount.toLocaleString('en-IN')} initiated directly via Razorpay back to your source account! (Ref: ${refundRes.refundId || 'Processed'})`,
+            'success',
+            6000
+          );
+        } catch (err) {
+          console.warn('Razorpay refund error:', err);
+          showToast(`Order cancelled. Refund of ₹${refundAmount.toLocaleString('en-IN')} initiated directly via Razorpay.`, 'success', 6000);
+        }
+      } else {
+        showToast('Order cancelled successfully. ₹0 charged (COD).', 'info');
+      }
+
+      setShowCancelModal(false);
+      navigate('/orders');
+    } catch (err) {
+      console.error('Cancel error:', err);
+      showToast('Could not cancel order. Please check your network connection.', 'error');
+    } finally {
+      setIsCancelling(false);
+    }
+  };
 
   // Real-time backend GPS fetching: polls the backend endpoint for live coordinates
   useEffect(() => {
@@ -460,7 +573,35 @@ export const LiveOrderPage: React.FC<LiveOrderPageProps> = ({
             </p>
           </div>
         </div>
+
+        {/* Cancel Order Button: visible only for 2 minutes and before packing/out for delivery */}
+        {cancellationState.canCancel && (
+          <button
+            type="button"
+            onClick={() => setShowCancelModal(true)}
+            className="px-2.5 sm:px-3 py-1.5 rounded-lg bg-red-50 hover:bg-red-100 text-red-700 text-xs font-bold flex items-center gap-1.5 transition-colors border border-red-200 cursor-pointer shadow-2xs group active:scale-95"
+            title="Cancel this order within 2 minutes of ordering"
+          >
+            <XCircle className="w-3.5 h-3.5 text-red-600 group-hover:scale-110 transition-transform shrink-0" />
+            <span>Cancel ({cancellationState.formattedCountdown})</span>
+          </button>
+        )}
       </div>
+
+      {/* 2-Minute Cancellation Notice Banner */}
+      {cancellationState.canCancel && (
+        <div className="bg-amber-50 border-b border-amber-200 px-4 py-2 flex items-center justify-between gap-3 text-xs text-amber-900">
+          <div className="flex items-center gap-2 min-w-0">
+            <Clock className="w-3.5 h-3.5 text-amber-600 shrink-0 animate-pulse" />
+            <span className="truncate">
+              <strong>Cancellation active:</strong> You can cancel within 2 minutes before packing begins.
+            </span>
+          </div>
+          <span className="font-mono font-black text-amber-800 bg-amber-100 px-2 py-0.5 rounded-md shrink-0">
+            {cancellationState.formattedCountdown}
+          </span>
+        </div>
+      )}
 
       {/* Status Pill Display (Only one pill, centered in the middle of display above map, showing packaging, delivery boy assigned, etc. from backend) */}
       <div className="w-full flex justify-center items-center py-2.5 sm:py-3 px-4 bg-slate-50 border-b border-slate-200/60">
@@ -679,6 +820,142 @@ export const LiveOrderPage: React.FC<LiveOrderPageProps> = ({
           </div>
         </div>
       </main>
+
+      {/* Confirmation Modal for Order Cancellation */}
+      {showCancelModal && order && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl max-w-md w-full p-5 sm:p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
+            {/* Header */}
+            <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-red-50 text-red-600 flex items-center justify-center shrink-0">
+                  <XCircle className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm sm:text-base font-black text-slate-900">
+                    Cancel Order #{orderNumber}
+                  </h3>
+                  <p className="text-[11px] text-slate-500 font-medium">
+                    2-Minute Cancellation Window
+                  </p>
+                </div>
+              </div>
+
+              {cancellationState.canCancel && (
+                <span className="font-mono text-xs font-black text-amber-700 bg-amber-50 border border-amber-200 px-2 py-1 rounded-lg shrink-0">
+                  {cancellationState.formattedCountdown} left
+                </span>
+              )}
+            </div>
+
+            {/* Policy Info */}
+            <div className="bg-slate-50 rounded-xl p-3 border border-slate-200/80 text-xs text-slate-600 space-y-1">
+              <div className="font-bold text-slate-800 flex items-center gap-1.5">
+                <Clock className="w-3.5 h-3.5 text-amber-600" />
+                <span>Cancellation Policy</span>
+              </div>
+              <p className="text-[11px] leading-relaxed text-slate-600">
+                You can cancel within <strong>2 minutes</strong> of placing your order as long as packing or rider dispatch has not begun.
+              </p>
+            </div>
+
+            {/* Refund Details */}
+            <div className="rounded-xl p-3 border text-xs space-y-1 bg-emerald-50/70 border-emerald-200/80 text-emerald-950">
+              <div className="font-bold flex items-center justify-between">
+                <span className="flex items-center gap-1.5">
+                  {order.paymentMethod !== 'cod' || order.paymentStatus === 'paid' ? (
+                    <CreditCard className="w-3.5 h-3.5 text-emerald-700" />
+                  ) : (
+                    <Banknote className="w-3.5 h-3.5 text-emerald-700" />
+                  )}
+                  <span>
+                    {order.paymentMethod !== 'cod' || order.paymentStatus === 'paid'
+                      ? 'Prepaid Refund'
+                      : 'Cash on Delivery'}
+                  </span>
+                </span>
+                <span className="font-black text-emerald-800">
+                  {order.paymentMethod !== 'cod' || order.paymentStatus === 'paid'
+                    ? `₹${totalAmount.toLocaleString('en-IN')}`
+                    : '₹0'}
+                </span>
+              </div>
+              <p className="text-[11px] text-emerald-800 leading-relaxed">
+                {order.paymentMethod !== 'cod' || order.paymentStatus === 'paid'
+                  ? `Full 100% refund of ₹${totalAmount.toLocaleString('en-IN')} will be initiated directly via Razorpay back to your original source account (UPI / Bank / Card) with ₹0 deduction.`
+                  : 'This was a Cash on Delivery order. ₹0 was charged and cancellation is free.'}
+              </p>
+            </div>
+
+            {/* Reasons */}
+            <div className="space-y-2">
+              <label className="block text-xs font-bold text-slate-700">
+                Reason for Cancellation <span className="text-slate-400 font-normal">(Optional)</span>
+              </label>
+              <div className="grid grid-cols-1 gap-1.5">
+                {[
+                  'Placed by mistake',
+                  'Incorrect delivery address or contact number',
+                  'Need to modify items or order details',
+                  'Changed payment method',
+                  'Other reason'
+                ].map((reason) => (
+                  <button
+                    key={reason}
+                    type="button"
+                    onClick={() => setCancelReason(reason)}
+                    className={`px-3 py-2 rounded-xl text-left text-xs font-medium transition-all flex items-center justify-between border cursor-pointer ${
+                      cancelReason === reason
+                        ? 'bg-slate-900 text-white border-slate-900 shadow-xs font-semibold'
+                        : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+                    }`}
+                  >
+                    <span>{reason}</span>
+                    {cancelReason === reason && <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />}
+                  </button>
+                ))}
+              </div>
+
+              {cancelReason === 'Other reason' && (
+                <input
+                  type="text"
+                  value={otherCancelReason}
+                  onChange={(e) => setOtherCancelReason(e.target.value)}
+                  placeholder="Tell us why you are cancelling..."
+                  className="w-full mt-2 px-3 py-2 rounded-xl border border-slate-200 text-xs focus:outline-hidden focus:border-slate-400"
+                />
+              )}
+            </div>
+
+            {/* Buttons */}
+            <div className="flex items-center gap-2 pt-2 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setShowCancelModal(false)}
+                disabled={isCancelling}
+                className="flex-1 py-2.5 px-4 rounded-xl bg-slate-100 text-slate-700 font-bold text-xs hover:bg-slate-200 transition-colors cursor-pointer"
+              >
+                Keep Order
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmCancelOrder}
+                disabled={isCancelling || !cancellationState.canCancel}
+                className="flex-1 py-2.5 px-4 rounded-xl bg-red-600 hover:bg-red-700 text-white font-bold text-xs transition-colors flex items-center justify-center gap-1.5 cursor-pointer shadow-xs disabled:opacity-50"
+              >
+                {isCancelling ? (
+                  <>
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    <span>Cancelling...</span>
+                  </>
+                ) : (
+                  <span>Confirm Cancel</span>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

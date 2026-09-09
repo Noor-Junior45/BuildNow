@@ -9,6 +9,7 @@ import rateLimit from "express-rate-limit";
 import { z } from "zod";
 import crypto from "crypto";
 import { createClient } from "@supabase/supabase-js";
+import Razorpay from "razorpay";
 
 dotenv.config();
 
@@ -2253,6 +2254,233 @@ async function startServer() {
       return res.status(500).json({
         success: false,
         message: err.message || "Failed to update rider location."
+      });
+    }
+  });
+
+  // =========================================================================
+  // RAZORPAY PAYMENT GATEWAY & REFUND ENDPOINTS
+  // =========================================================================
+  let razorpayClientInstance: any = null;
+  function getRazorpayClient(): any {
+    const keyId = (process.env.RAZORPAY_KEY_ID || process.env.VITE_RAZORPAY_KEY_ID || "").trim();
+    const keySecret = (process.env.RAZORPAY_KEY_SECRET || "").trim();
+    if (!keyId || !keySecret) {
+      return null;
+    }
+    if (!razorpayClientInstance) {
+      try {
+        razorpayClientInstance = new (Razorpay as any)({
+          key_id: keyId,
+          key_secret: keySecret
+        });
+      } catch (err) {
+        console.warn("[Razorpay Init Warning]:", err);
+        return null;
+      }
+    }
+    return razorpayClientInstance;
+  }
+
+  // 1. GET /api/razorpay/config - Fetch public key & payment configuration
+  app.get("/api/razorpay/config", (req, res) => {
+    res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
+    const keyId = (process.env.RAZORPAY_KEY_ID || process.env.VITE_RAZORPAY_KEY_ID || "").trim();
+    const isConfigured = Boolean(keyId && (process.env.RAZORPAY_KEY_SECRET || "").trim());
+    res.json({
+      success: true,
+      keyId: keyId || "rzp_test_placeholder",
+      isConfigured,
+      merchantName: "Giriraj Power",
+      currency: "INR"
+    });
+  });
+
+  // 2. POST /api/razorpay/create-order - Create Razorpay order on the server
+  app.post("/api/razorpay/create-order", async (req, res) => {
+    res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
+    try {
+      const { amount, receipt, notes } = req.body || {};
+      const parsedAmount = Number(amount);
+      if (isNaN(parsedAmount) || parsedAmount <= 0) {
+        return res.status(400).json({
+          success: false,
+          message: "A valid positive amount in rupees is required."
+        });
+      }
+
+      const amountInPaise = Math.round(parsedAmount * 100);
+      const keyId = (process.env.RAZORPAY_KEY_ID || process.env.VITE_RAZORPAY_KEY_ID || "").trim();
+      const razorpay = getRazorpayClient();
+
+      if (razorpay) {
+        const orderOptions = {
+          amount: amountInPaise,
+          currency: "INR",
+          receipt: receipt || `rcpt_${Date.now()}`,
+          payment_capture: 1,
+          notes: notes || {}
+        };
+        const order = await razorpay.orders.create(orderOptions);
+        return res.status(200).json({
+          success: true,
+          orderId: order.id,
+          amount: order.amount,
+          currency: order.currency,
+          keyId,
+          isLive: true
+        });
+      } else {
+        // Safe development simulation fallback when live credentials are not set
+        const mockOrderId = `order_test_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+        return res.status(200).json({
+          success: true,
+          orderId: mockOrderId,
+          amount: amountInPaise,
+          currency: "INR",
+          keyId: keyId || "rzp_test_demo",
+          isLive: false,
+          note: "Razorpay keys not configured in environment. Using test gateway mode."
+        });
+      }
+    } catch (err: any) {
+      console.error("Razorpay order creation error:", err);
+      return res.status(500).json({
+        success: false,
+        message: err?.message || "Failed to create Razorpay order."
+      });
+    }
+  });
+
+  // 3. POST /api/razorpay/verify-payment - Cryptographically verify payment signature
+  app.post("/api/razorpay/verify-payment", async (req, res) => {
+    res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
+    try {
+      const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = req.body || {};
+
+      if (!razorpay_order_id || !razorpay_payment_id) {
+        return res.status(400).json({
+          success: false,
+          verified: false,
+          message: "Missing razorpay_order_id or razorpay_payment_id in payload."
+        });
+      }
+
+      const keySecret = (process.env.RAZORPAY_KEY_SECRET || "").trim();
+
+      if (keySecret) {
+        if (!razorpay_signature) {
+          return res.status(400).json({
+            success: false,
+            verified: false,
+            message: "Payment signature is required for cryptographic verification."
+          });
+        }
+
+        // HMAC SHA256 Signature Verification
+        const payloadToSign = `${razorpay_order_id}|${razorpay_payment_id}`;
+        const generatedSignature = crypto
+          .createHmac("sha256", keySecret)
+          .update(payloadToSign)
+          .digest("hex");
+
+        const isValid = generatedSignature === razorpay_signature;
+
+        if (!isValid) {
+          return res.status(400).json({
+            success: false,
+            verified: false,
+            message: "Invalid payment signature. Verification failed."
+          });
+        }
+
+        return res.status(200).json({
+          success: true,
+          verified: true,
+          paymentId: razorpay_payment_id,
+          orderId: razorpay_order_id,
+          message: "Razorpay payment verified successfully."
+        });
+      } else {
+        // Fallback for development test mode without keys
+        return res.status(200).json({
+          success: true,
+          verified: true,
+          paymentId: razorpay_payment_id,
+          orderId: razorpay_order_id,
+          message: "Development test payment approved."
+        });
+      }
+    } catch (err: any) {
+      console.error("Razorpay payment verification error:", err);
+      return res.status(500).json({
+        success: false,
+        verified: false,
+        message: err?.message || "Failed to verify Razorpay payment."
+      });
+    }
+  });
+
+  // 4. POST /api/razorpay/refund - Process cancellation refund via Razorpay
+  app.post("/api/razorpay/refund", async (req, res) => {
+    res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
+    try {
+      const { paymentId, amount, orderId, reason } = req.body || {};
+
+      if (!paymentId) {
+        return res.status(400).json({
+          success: false,
+          message: "Payment ID is required to process a refund."
+        });
+      }
+
+      const razorpay = getRazorpayClient();
+      const parsedAmount = amount ? Number(amount) : undefined;
+      const amountInPaise = parsedAmount && parsedAmount > 0 ? Math.round(parsedAmount * 100) : undefined;
+
+      if (razorpay) {
+        const refundPayload: any = {
+          speed: "optimum",
+          notes: {
+            orderId: orderId || "N/A",
+            reason: reason || "Order cancelled by customer within 2-minute window"
+          }
+        };
+        if (amountInPaise) {
+          refundPayload.amount = amountInPaise;
+        }
+
+        const refundResult = await razorpay.payments.refund(paymentId, refundPayload);
+
+        return res.status(200).json({
+          success: true,
+          refundId: refundResult.id,
+          status: refundResult.status || "processed",
+          amount: refundResult.amount ? refundResult.amount / 100 : parsedAmount,
+          currency: refundResult.currency || "INR",
+          speedProcessed: refundResult.speed_processed || "optimum",
+          paymentId,
+          message: "Refund initiated successfully by Razorpay directly back to user's account."
+        });
+      } else {
+        // Development simulation mode
+        const mockRefundId = `rfnd_test_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+        return res.status(200).json({
+          success: true,
+          refundId: mockRefundId,
+          status: "processed",
+          amount: parsedAmount || 0,
+          currency: "INR",
+          speedProcessed: "optimum",
+          paymentId,
+          message: "Simulated Razorpay refund processed directly back to source account."
+        });
+      }
+    } catch (err: any) {
+      console.error("Razorpay refund processing error:", err);
+      return res.status(500).json({
+        success: false,
+        message: err?.message || "Failed to process Razorpay refund."
       });
     }
   });

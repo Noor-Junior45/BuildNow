@@ -1307,6 +1307,7 @@ export default function App() {
             element={
               <OrderHistoryView
                 orders={orders}
+                userProfile={userProfile}
                 onOpenShop={() => navigate('/electrical')}
                 onRefresh={handleRefreshAll}
               />

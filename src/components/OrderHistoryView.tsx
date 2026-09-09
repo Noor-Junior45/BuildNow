@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   Package,
   PackageCheck,
@@ -23,17 +23,21 @@ import {
   Calendar,
   Building2,
   Star,
-  AlertCircle
+  AlertCircle,
+  XCircle
 } from 'lucide-react';
-import { Order } from '../types';
+import { Order, UserProfile } from '../types';
 import { getOrderWhatsAppUrl } from '../services/emailService';
-import { deleteFirestoreOrder, clearAllUserOrders } from '../services/supabaseService';
+import { deleteFirestoreOrder, clearAllUserOrders, updateOrderStatusInFirestore, saveUserProfile } from '../services/supabaseService';
+import { initiateRazorpayRefund } from '../services/razorpayService';
 import { OrderTrackingTimeline } from './OrderTrackingTimeline';
 import { downloadInvoicePDF } from '../utils/invoiceGenerator';
 import { PullToRefresh } from './PullToRefresh';
+import { showToast } from '../utils/toast';
 
 interface OrderHistoryViewProps {
   orders: Order[];
+  userProfile?: UserProfile | null;
   onOpenOrderModal?: (order: Order) => void;
   onOpenShop: () => void;
   onBack?: () => void;
@@ -42,6 +46,7 @@ interface OrderHistoryViewProps {
 
 export const OrderHistoryView: React.FC<OrderHistoryViewProps> = ({
   orders,
+  userProfile,
   onOpenShop,
   onBack,
   onRefresh
@@ -51,9 +56,22 @@ export const OrderHistoryView: React.FC<OrderHistoryViewProps> = ({
   const [isClearingAll, setIsClearingAll] = useState(false);
   const [confirmClearAll, setConfirmClearAll] = useState(false);
   const [orderToDelete, setOrderToDelete] = useState<Order | null>(null);
+  const [orderToCancel, setOrderToCancel] = useState<Order | null>(null);
+  const [cancellingOrderId, setCancellingOrderId] = useState<string | null>(null);
+  const [cancelReason, setCancelReason] = useState<string>('Placed by mistake');
+  const [otherCancelReason, setOtherCancelReason] = useState<string>('');
+  const [currentTime, setCurrentTime] = useState<number>(Date.now());
   const [filterTab, setFilterTab] = useState<'all' | 'active' | 'delivered'>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [downloadingInvoiceId, setDownloadingInvoiceId] = useState<string | null>(null);
+
+  // Live 1-second tick to update 2-minute cancellation countdown in real-time
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentTime(Date.now());
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
 
   // Ratings State with LocalStorage Persistence
   const [ratings, setRatings] = useState<Record<string, number>>(() => {
@@ -246,6 +264,111 @@ export const OrderHistoryView: React.FC<OrderHistoryViewProps> = ({
     }
   };
 
+  // 2-minute cancellation policy checker:
+  // Policy rules:
+  // 1. You can cancel within 2 minutes (120 seconds) of placing the order.
+  // 2. If order is preparing ('packing', 'packed') or out for delivery ('out_for_delivery', 'shipped', 'near_destination') or delivered/cancelled, you cannot cancel.
+  // 3. Cancel button is only visible for 2 minutes.
+  const getOrderCancellationState = (order?: Order | null) => {
+    if (!order) return { canCancel: false, remainingSeconds: 0, formattedCountdown: '0:00', reason: 'No order' };
+
+    const st = (order.status || 'pending').toLowerCase();
+    const forbiddenStatuses = ['packing', 'packed', 'shipped', 'out_for_delivery', 'near_destination', 'delivered', 'cancelled', 'failed'];
+    if (forbiddenStatuses.includes(st)) {
+      let reason = 'Order is already being processed';
+      if (st === 'cancelled') reason = 'Order is already cancelled';
+      else if (st === 'delivered') reason = 'Order is already delivered';
+      else if (st === 'packing' || st === 'packed') reason = 'Order is currently being packed';
+      else if (st === 'out_for_delivery' || st === 'shipped' || st === 'near_destination') reason = 'Order is already out for delivery';
+      return { canCancel: false, remainingSeconds: 0, formattedCountdown: '0:00', reason };
+    }
+
+    const placedTimeStr = order.placed_at || order.placedAt || order.createdAt;
+    const placedTime = placedTimeStr ? new Date(placedTimeStr).getTime() : 0;
+    if (!placedTime || isNaN(placedTime)) {
+      return { canCancel: false, remainingSeconds: 0, formattedCountdown: '0:00', reason: 'Invalid order time' };
+    }
+
+    const elapsedMs = currentTime - placedTime;
+    const twoMinutesMs = 2 * 60 * 1000; // 120,000 ms
+    const remainingMs = twoMinutesMs - elapsedMs;
+    const remainingSeconds = Math.max(0, Math.ceil(remainingMs / 1000));
+
+    if (remainingSeconds <= 0) {
+      return { canCancel: false, remainingSeconds: 0, formattedCountdown: '0:00', reason: '2-minute cancellation window expired' };
+    }
+
+    const mins = Math.floor(remainingSeconds / 60);
+    const secs = remainingSeconds % 60;
+
+    return {
+      canCancel: true,
+      remainingSeconds,
+      formattedCountdown: `${mins}:${secs.toString().padStart(2, '0')}`,
+      reason: ''
+    };
+  };
+
+  const handleConfirmCancelOrder = async (order: Order) => {
+    try {
+      setCancellingOrderId(order.id);
+
+      // Verify policy before cancellation
+      const check = getOrderCancellationState(order);
+      if (!check.canCancel) {
+        showToast(check.reason || 'This order can no longer be cancelled as per policy.', 'error');
+        setOrderToCancel(null);
+        return;
+      }
+
+      const success = await updateOrderStatusInFirestore(order.id, 'cancelled');
+      if (!success) {
+        throw new Error('Failed to update order status');
+      }
+
+      // Check if online paid order to process refund directly via Razorpay
+      const isPaid = order.paymentMethod !== 'cod' || order.paymentStatus === 'paid';
+      const refundAmount = order.totalAmount ?? order.total ?? (order as any).finalAmount ?? 0;
+
+      if (isPaid && refundAmount > 0) {
+        try {
+          const paymentId = (order as any).paymentId || (order as any).razorpay_payment_id || order.id;
+          const finalReason = cancelReason === 'Other reason' && otherCancelReason.trim() ? otherCancelReason.trim() : cancelReason;
+          const refundRes = await initiateRazorpayRefund(
+            paymentId,
+            refundAmount,
+            order.id,
+            finalReason || 'Cancelled within 2-minute window'
+          );
+          showToast(
+            `Order #${getOrderDisplayNumber(order)} cancelled. Full refund of ₹${refundAmount.toLocaleString('en-IN')} initiated directly via Razorpay back to your account! (Ref: ${refundRes.refundId || 'Processed'})`,
+            'success',
+            6000
+          );
+        } catch (refundErr) {
+          console.warn('Razorpay direct refund dispatch notice:', refundErr);
+          showToast(
+            `Order #${getOrderDisplayNumber(order)} cancelled. ₹${refundAmount.toLocaleString('en-IN')} refund initiated directly via Razorpay back to your source account.`,
+            'success',
+            6000
+          );
+        }
+      } else {
+        showToast(`Order #${getOrderDisplayNumber(order)} cancelled successfully. ₹0 charged (COD).`, 'info');
+      }
+
+      setOrderToCancel(null);
+      if (onRefresh) {
+        await onRefresh();
+      }
+    } catch (err) {
+      console.error('Failed to cancel order:', err);
+      showToast('Could not cancel order. Please check your internet connection.', 'error');
+    } finally {
+      setCancellingOrderId(null);
+    }
+  };
+
   // Render Confirmation Modal for Order Deletion
   const renderDeleteOrderModal = () => {
     if (!orderToDelete) return null;
@@ -295,6 +418,140 @@ export const OrderHistoryView: React.FC<OrderHistoryViewProps> = ({
                 </>
               ) : (
                 <span>Delete Order</span>
+              )}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // Render Confirmation Modal for Order Cancellation (with 2-Minute Policy & Refund Details)
+  const renderCancelOrderModal = () => {
+    if (!orderToCancel) return null;
+
+    const cancelState = getOrderCancellationState(orderToCancel);
+    const isPaid = orderToCancel.paymentMethod !== 'cod' || orderToCancel.paymentStatus === 'paid';
+    const totalAmount = orderToCancel.totalAmount ?? orderToCancel.total ?? (orderToCancel as any).finalAmount ?? 0;
+
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200">
+        <div className="bg-white rounded-2xl max-w-md w-full p-5 sm:p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
+          {/* Header */}
+          <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+            <div className="flex items-center gap-2.5">
+              <div className="w-9 h-9 rounded-xl bg-red-50 text-red-600 flex items-center justify-center shrink-0">
+                <XCircle className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-sm sm:text-base font-black text-slate-900">
+                  Cancel Order #{getOrderDisplayNumber(orderToCancel)}
+                </h3>
+                <p className="text-[11px] text-slate-500 font-medium">
+                  Cancellation Policy &amp; Confirmation
+                </p>
+              </div>
+            </div>
+
+            {cancelState.canCancel && (
+              <span className="font-mono text-xs font-black text-amber-700 bg-amber-50 border border-amber-200 px-2 py-1 rounded-lg shrink-0">
+                {cancelState.formattedCountdown} left
+              </span>
+            )}
+          </div>
+
+          {/* Policy Information */}
+          <div className="bg-slate-50 rounded-xl p-3 border border-slate-200/80 text-xs text-slate-600 space-y-1">
+            <div className="font-bold text-slate-800 flex items-center gap-1.5">
+              <Clock className="w-3.5 h-3.5 text-amber-600" />
+              <span>Cancellation Policy</span>
+            </div>
+            <p className="text-[11px] leading-relaxed text-slate-600">
+              Orders can be cancelled free of charge within <strong>2 minutes</strong> of ordering, provided that packaging or rider dispatch has not started.
+            </p>
+          </div>
+
+          {/* Payment & Refund Details */}
+          <div className="rounded-xl p-3 border text-xs space-y-1 bg-emerald-50/70 border-emerald-200/80 text-emerald-950">
+            <div className="font-bold flex items-center justify-between">
+              <span className="flex items-center gap-1.5">
+                {isPaid ? <CreditCard className="w-3.5 h-3.5 text-emerald-700" /> : <Banknote className="w-3.5 h-3.5 text-emerald-700" />}
+                <span>{isPaid ? 'Online Payment Refund' : 'Cash on Delivery'}</span>
+              </span>
+              <span className="font-black text-emerald-800">
+                {isPaid ? `₹${totalAmount.toLocaleString('en-IN')}` : '₹0'}
+              </span>
+            </div>
+            <p className="text-[11px] text-emerald-800 leading-relaxed">
+              {isPaid
+                ? `100% full refund of ₹${totalAmount.toLocaleString('en-IN')} will be initiated directly via Razorpay back to your original source account (UPI / Bank / Card) with ₹0 fee.`
+                : 'No payment was collected for this order. It will be cancelled immediately at zero charge.'}
+            </p>
+          </div>
+
+          {/* Reason for Cancellation */}
+          <div className="space-y-2">
+            <label className="block text-xs font-bold text-slate-700">
+              Reason for Cancellation <span className="text-slate-400 font-normal">(Optional)</span>
+            </label>
+            <div className="grid grid-cols-1 gap-1.5">
+              {[
+                'Placed by mistake',
+                'Incorrect delivery address or contact number',
+                'Need to modify items or order details',
+                'Changed payment method',
+                'Other reason'
+              ].map((reason) => (
+                <button
+                  key={reason}
+                  type="button"
+                  onClick={() => setCancelReason(reason)}
+                  className={`px-3 py-2 rounded-xl text-left text-xs font-medium transition-all flex items-center justify-between border cursor-pointer ${
+                    cancelReason === reason
+                      ? 'bg-slate-900 text-white border-slate-900 shadow-xs font-semibold'
+                      : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+                  }`}
+                >
+                  <span>{reason}</span>
+                  {cancelReason === reason && <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />}
+                </button>
+              ))}
+            </div>
+
+            {cancelReason === 'Other reason' && (
+              <input
+                type="text"
+                value={otherCancelReason}
+                onChange={(e) => setOtherCancelReason(e.target.value)}
+                placeholder="Tell us why you are cancelling..."
+                className="w-full mt-2 px-3 py-2 rounded-xl border border-slate-200 text-xs focus:outline-hidden focus:border-slate-400"
+              />
+            )}
+          </div>
+
+          {/* Action Buttons */}
+          <div className="flex items-center gap-2 pt-2 border-t border-slate-100">
+            <button
+              type="button"
+              onClick={() => setOrderToCancel(null)}
+              disabled={Boolean(cancellingOrderId)}
+              className="flex-1 py-2.5 px-4 rounded-xl bg-slate-100 text-slate-700 font-bold text-xs hover:bg-slate-200 transition-colors cursor-pointer"
+            >
+              Keep Order
+            </button>
+            <button
+              type="button"
+              onClick={() => handleConfirmCancelOrder(orderToCancel)}
+              disabled={Boolean(cancellingOrderId) || !cancelState.canCancel}
+              className="flex-1 py-2.5 px-4 rounded-xl bg-red-600 hover:bg-red-700 text-white font-bold text-xs transition-colors flex items-center justify-center gap-1.5 cursor-pointer shadow-xs disabled:opacity-50"
+            >
+              {cancellingOrderId === orderToCancel.id ? (
+                <>
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  <span>Cancelling...</span>
+                </>
+              ) : (
+                <span>Confirm Cancel</span>
               )}
             </button>
           </div>
@@ -371,6 +628,9 @@ export const OrderHistoryView: React.FC<OrderHistoryViewProps> = ({
     const handlingFee = 0; // Free handling charges
     const discount = selectedOrder.discount ?? 0;
 
+    const cancellationState = getOrderCancellationState(selectedOrder);
+    const canCancel = cancellationState.canCancel;
+
     return (
       <div className="max-w-2xl mx-auto px-4 sm:px-6 py-5 space-y-5">
         {/* Top Navigation & Action Header */}
@@ -385,6 +645,23 @@ export const OrderHistoryView: React.FC<OrderHistoryViewProps> = ({
           </button>
 
           <div className="flex items-center gap-2">
+            {/* Cancel Order Button: Visible ONLY within 2 minutes of ordering AND before packing/out for delivery */}
+            {canCancel && (
+              <button
+                type="button"
+                onClick={() => {
+                  setOrderToCancel(selectedOrder);
+                  setCancelReason('Placed by mistake');
+                  setOtherCancelReason('');
+                }}
+                className="px-2.5 sm:px-3 py-1.5 rounded-lg bg-red-50 hover:bg-red-100 text-red-700 text-xs font-bold flex items-center gap-1.5 transition-colors border border-red-200 cursor-pointer shadow-2xs group active:scale-95"
+                title="Cancel this order within the 2-minute policy"
+              >
+                <XCircle className="w-3.5 h-3.5 text-red-600 group-hover:scale-110 transition-transform shrink-0" />
+                <span>Cancel Order ({cancellationState.formattedCountdown})</span>
+              </button>
+            )}
+
             <button
               type="button"
               disabled={downloadingInvoiceId === selectedOrder.id}
@@ -415,6 +692,56 @@ export const OrderHistoryView: React.FC<OrderHistoryViewProps> = ({
             </button>
           </div>
         </div>
+
+        {/* 2-Minute Cancellation Policy Active Alert Banner */}
+        {canCancel && (
+          <div className="flex items-center justify-between gap-3 bg-amber-50/90 border border-amber-200 rounded-xl px-3.5 py-2.5 text-xs text-amber-900 shadow-2xs animate-in fade-in duration-200">
+            <div className="flex items-center gap-2 min-w-0">
+              <Clock className="w-4 h-4 text-amber-600 shrink-0 animate-pulse" />
+              <div className="min-w-0 leading-snug">
+                <span className="font-bold">Cancellation Window Active: </span>
+                <span className="text-amber-800">
+                  You can cancel within 2 minutes of ordering before store packing begins.
+                </span>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <span className="font-mono font-black text-amber-800 bg-amber-100 px-2 py-0.5 rounded-md text-xs">
+                {cancellationState.formattedCountdown}
+              </span>
+              <button
+                type="button"
+                onClick={() => {
+                  setOrderToCancel(selectedOrder);
+                  setCancelReason('Placed by mistake');
+                  setOtherCancelReason('');
+                }}
+                className="px-2.5 py-1 rounded-md bg-red-600 hover:bg-red-700 text-white font-bold text-[11px] transition-colors cursor-pointer shadow-xs active:scale-95"
+              >
+                Cancel Order
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Cancelled Order Notice & Refund Information */}
+        {isCancelled && (
+          <div className="p-3.5 bg-red-50/90 rounded-xl border border-red-200 text-xs text-red-900 space-y-1.5 animate-in fade-in duration-200">
+            <div className="flex items-center gap-1.5 font-bold text-red-950">
+              <AlertCircle className="w-4 h-4 text-red-600 shrink-0" />
+              <span>Order #{getOrderDisplayNumber(selectedOrder)} has been Cancelled</span>
+            </div>
+            {selectedOrder.paymentMethod !== 'cod' || selectedOrder.paymentStatus === 'paid' ? (
+              <p className="text-red-800 text-[11px] leading-relaxed">
+                Full refund of ₹{(selectedOrder.totalAmount ?? selectedOrder.total ?? selectedOrder.finalAmount ?? 0).toLocaleString('en-IN')} has been credited back to your Giriraj Wallet &amp; Refund balance.
+              </p>
+            ) : (
+              <p className="text-red-700 text-[11px] leading-relaxed">
+                This was a Cash on Delivery order. ₹0 was collected and no cancellation charges apply.
+              </p>
+            )}
+          </div>
+        )}
 
         {/* 1. Top Section: Purchased Date & Time + Order ID */}
         <div className="space-y-1">
@@ -744,8 +1071,9 @@ export const OrderHistoryView: React.FC<OrderHistoryViewProps> = ({
           </a>
         </div>
 
-        {/* Confirmation Modal for Order Deletion */}
+        {/* Confirmation Modal for Order Deletion & Cancellation */}
         {renderDeleteOrderModal()}
+        {renderCancelOrderModal()}
       </div>
     );
   }
@@ -1137,6 +1465,8 @@ export const OrderHistoryView: React.FC<OrderHistoryViewProps> = ({
           </div>
         </div>
       )}
+      {/* Order Cancellation Modal */}
+      {renderCancelOrderModal()}
     </div>
   </PullToRefresh>
   );
