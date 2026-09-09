@@ -515,6 +515,127 @@ export async function verifyPhoneOtp(
 }
 
 /**
+ * Helper to normalize phone numbers to E.164 (+91XXXXXXXXXX with no spaces)
+ */
+export function formatToE164Phone(rawPhone: string): string {
+  let digits = rawPhone.replace(/[^0-9]/g, '');
+  if (digits.length === 11 && digits.startsWith('0')) {
+    digits = digits.slice(1);
+  }
+  if (digits.length === 12 && digits.startsWith('91')) {
+    return `+${digits}`;
+  }
+  if (rawPhone.trim().startsWith('+')) {
+    return `+${digits}`;
+  }
+  return `+91${digits.slice(-10)}`;
+}
+
+/**
+ * Check if a Supabase Auth error indicates the phone/email is already registered to another account
+ */
+export function isCredentialConflictError(err: any): boolean {
+  if (!err) return false;
+  const msg = (err.message || '').toLowerCase();
+  const code = (err.code || '').toLowerCase();
+  const status = err.status;
+  return (
+    status === 422 ||
+    status === 409 ||
+    code.includes('duplicate') ||
+    code.includes('conflict') ||
+    code.includes('already_exists') ||
+    code.includes('phone_exists') ||
+    msg.includes('already registered') ||
+    msg.includes('already in use') ||
+    msg.includes('already exists') ||
+    msg.includes('already linked') ||
+    msg.includes('conflict') ||
+    msg.includes('duplicate') ||
+    msg.includes('phone_exists') ||
+    msg.includes('user with this phone already exists') ||
+    msg.includes('user with this email already exists') ||
+    msg.includes('phone number is already registered') ||
+    msg.includes('phone number already registered')
+  );
+}
+
+/**
+ * Links a mobile number to the currently logged in Supabase user account.
+ * Triggers Supabase to send a verification OTP via the configured custom SMS hook.
+ */
+export async function linkPhoneToUser(
+  fullE164Number: string
+): Promise<{ success: boolean; error?: string; isConflict?: boolean }> {
+  try {
+    const { data, error } = await supabase.auth.updateUser({ phone: fullE164Number });
+    if (error) {
+      const isConflict = isCredentialConflictError(error);
+      return {
+        success: false,
+        error: isConflict ? 'This mobile number is already linked to another account.' : error.message,
+        isConflict
+      };
+    }
+    return { success: true };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return { success: false, error: msg };
+  }
+}
+
+/**
+ * Confirms and finalizes phone linking using Supabase's 'phone_change' OTP verification.
+ */
+export async function verifyPhoneChangeOtp(
+  fullE164Number: string,
+  token: string
+): Promise<{ success: boolean; error?: string; isConflict?: boolean }> {
+  try {
+    const { data, error } = await supabase.auth.verifyOtp({
+      phone: fullE164Number,
+      token: token.trim(),
+      type: 'phone_change'
+    });
+    if (error) {
+      const isConflict = isCredentialConflictError(error);
+      return {
+        success: false,
+        error: isConflict ? 'This mobile number is already linked to another account.' : error.message,
+        isConflict
+      };
+    }
+    return { success: true };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return { success: false, error: msg };
+  }
+}
+
+/**
+ * Links an email address to the currently logged in Supabase user account.
+ */
+export async function linkEmailToUser(
+  email: string
+): Promise<{ success: boolean; error?: string; isConflict?: boolean }> {
+  try {
+    const { data, error } = await supabase.auth.updateUser({ email: email.trim().toLowerCase() });
+    if (error) {
+      const isConflict = isCredentialConflictError(error);
+      return {
+        success: false,
+        error: isConflict ? 'This email address is already linked to another account.' : error.message,
+        isConflict
+      };
+    }
+    return { success: true };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return { success: false, error: msg };
+  }
+}
+
+/**
  * 4. Sign Out from Supabase
  */
 export async function signOutUser(): Promise<void> {
@@ -887,6 +1008,7 @@ export function getSavedUserProfile(userScopeOverride?: string): UserProfile | n
 export async function saveUserProfile(
   data: {
     phone?: string;
+    phoneVerified?: boolean;
     name?: string;
     email?: string;
     emailVerified?: boolean;
@@ -907,6 +1029,7 @@ export async function saveUserProfile(
   const existing = (scope ? getSavedUserProfile(scope) : null) || {
     name: 'Customer',
     phone: '',
+    phoneVerified: false,
     email: '',
     emailVerified: false,
     walletBalance: 0,
@@ -919,6 +1042,7 @@ export async function saveUserProfile(
   const updated: UserProfile = {
     ...existing,
     phone: data.phone !== undefined ? data.phone : existing.phone,
+    phoneVerified: data.phoneVerified !== undefined ? data.phoneVerified : existing.phoneVerified,
     name: data.name !== undefined ? data.name : existing.name,
     email: effectiveEmail,
     emailVerified: data.emailVerified !== undefined ? data.emailVerified : existing.emailVerified,

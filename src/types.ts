@@ -259,6 +259,7 @@ export interface UserProfile {
   id?: string;
   name: string;
   phone: string;
+  phoneVerified?: boolean;
   email?: string;
   emailVerified?: boolean;
   photoURL?: string;
