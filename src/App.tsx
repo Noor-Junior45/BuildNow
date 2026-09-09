@@ -71,10 +71,8 @@ import { App as CapApp } from '@capacitor/app';
 import { SplashScreen } from '@capacitor/splash-screen';
 import { initPushNotifications } from './services/pushNotificationService';
 import { showToast } from './utils/toast';
-import { useTheme } from './utils/theme';
 
 export default function App() {
-  useTheme();
   const navigate = useNavigate();
   const location = useLocation();
 

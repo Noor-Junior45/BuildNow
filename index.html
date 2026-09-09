@@ -29,29 +29,6 @@
         }
       });
     </script>
-    <script>
-      // Immediate theme initialization to prevent flash on page load
-      (function() {
-        try {
-          var mode = localStorage.getItem('giriraj_theme_mode') || 'system';
-          var isDark = false;
-          if (mode === 'dark') {
-            isDark = true;
-          } else if (mode === 'light') {
-            isDark = false;
-          } else {
-            isDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
-          }
-          if (isDark) {
-            document.documentElement.classList.add('dark');
-            document.documentElement.setAttribute('data-theme', 'dark');
-          } else {
-            document.documentElement.classList.remove('dark');
-            document.documentElement.setAttribute('data-theme', 'light');
-          }
-        } catch (e) {}
-      })();
-    </script>
     <!-- Google tag (gtag.js) -->
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-E3TVJRTKRP"></script>
     <script>

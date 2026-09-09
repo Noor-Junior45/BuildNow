@@ -1,7 +1,6 @@
 import React from 'react';
-import { ArrowLeft, Bell } from 'lucide-react';
+import { ArrowLeft } from 'lucide-react';
 import { requestPushNotificationPermission } from '../../services/pushNotificationService';
-import { ThemeSettingsSection } from './ThemeSettingsSection';
 
 interface NotificationsSubPageProps {
   mobileAlerts: boolean;
@@ -40,20 +39,7 @@ export const NotificationsSubPage: React.FC<NotificationsSubPageProps> = ({
       </div>
 
       <div className="max-w-2xl mx-auto p-4 sm:p-6 space-y-4">
-        {/* Theme Settings Section directly on top of notification button in starting */}
-        <ThemeSettingsSection />
-
         <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-2xs space-y-5">
-          <div className="border-b border-slate-100 pb-2">
-            <h2 className="text-sm sm:text-base font-bold text-slate-900 leading-snug flex items-center gap-2">
-              <Bell className="w-4 h-4 text-emerald-600" />
-              <span>Notification Preferences</span>
-            </h2>
-            <p className="text-xs sm:text-[13px] text-slate-600 font-normal mt-0.5 leading-relaxed">
-              Manage order alerts, live rider location, and transaction notifications
-            </p>
-          </div>
-
           {/* Mobile Push Notifications */}
           <div className="flex items-center justify-between gap-4">
             <div className="flex-1 pr-2">
