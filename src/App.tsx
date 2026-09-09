@@ -54,6 +54,7 @@ import {
   getInitialAuthSession,
   fetchProductsFromSupabase,
   fetchUserProfileFromSupabase,
+  cleanPhoneAutofill,
   fetchUserOrders,
   retryPendingSync,
   subscribeToUserProfile,
@@ -70,8 +71,10 @@ import { App as CapApp } from '@capacitor/app';
 import { SplashScreen } from '@capacitor/splash-screen';
 import { initPushNotifications } from './services/pushNotificationService';
 import { showToast } from './utils/toast';
+import { useTheme } from './utils/theme';
 
 export default function App() {
+  useTheme();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -219,12 +222,13 @@ export default function App() {
         activeUserId = userId;
         unsubscribeProfile = subscribeToUserProfile(userId, (freshData) => {
           setUserProfile((prev) => {
+            const updatedPhone = cleanPhoneAutofill(freshData.phone || prev?.phone || '');
             const updated: UserProfile = {
               ...(prev || ({} as UserProfile)),
               ...freshData,
               id: userId,
               name: freshData.name || prev?.name || 'Customer',
-              phone: freshData.phone || prev?.phone || '',
+              phone: updatedPhone,
               email: freshData.email || prev?.email || '',
               dob: freshData.dob || prev?.dob || '',
               photoURL: freshData.photoURL || prev?.photoURL,
@@ -239,7 +243,7 @@ export default function App() {
             return updated;
           });
           if (freshData.phone) {
-            setUserPhone(freshData.phone);
+            setUserPhone(cleanPhoneAutofill(freshData.phone));
           }
           if (freshData.name) {
             setUserName(freshData.name);
@@ -262,12 +266,13 @@ export default function App() {
         fetchUserProfileFromSupabase(activeUserId).then((cloudProf) => {
           if (cloudProf) {
             setUserProfile((prev) => {
+              const mergedPhone = cleanPhoneAutofill(cloudProf.phone || prev?.phone || '');
               const merged: UserProfile = {
                 ...(prev || ({} as UserProfile)),
                 ...cloudProf,
                 id: activeUserId!,
                 name: cloudProf.name || prev?.name || 'Customer',
-                phone: cloudProf.phone || prev?.phone || '',
+                phone: mergedPhone,
                 email: cloudProf.email || prev?.email || '',
                 dob: cloudProf.dob || prev?.dob || '',
                 photoURL: cloudProf.photoURL || prev?.photoURL,
@@ -281,7 +286,7 @@ export default function App() {
               }
               return merged;
             });
-            if (cloudProf.phone) setUserPhone(cloudProf.phone);
+            if (cloudProf.phone) setUserPhone(cleanPhoneAutofill(cloudProf.phone));
             if (cloudProf.name) setUserName(cloudProf.name);
           }
         }).catch(() => {});
@@ -301,7 +306,7 @@ export default function App() {
         }
         const userMeta = user.user_metadata || {};
         const local = getSavedUserProfile(scope || undefined);
-        const phone = user.phone || userMeta.phone || local?.phone || '';
+        const phone = cleanPhoneAutofill(user.phone || userMeta.phone || local?.phone || '');
         const name = userMeta.full_name || userMeta.name || local?.name || (user.email ? user.email.split('@')[0] : 'Customer');
         const email = user.email || local?.email || '';
         const photoURL = userMeta.avatar_url || userMeta.picture || local?.photoURL || undefined;
@@ -322,12 +327,13 @@ export default function App() {
         fetchUserProfileFromSupabase(user.id)
           .then((cloudProf) => {
             if (cloudProf) {
+              const mergedPhone = cleanPhoneAutofill(cloudProf.phone || prof.phone);
               const merged: UserProfile = {
                 ...prof,
                 ...cloudProf,
                 id: user.id,
                 name: cloudProf.name || prof.name,
-                phone: cloudProf.phone || prof.phone,
+                phone: mergedPhone,
                 email: cloudProf.email || prof.email,
                 dob: cloudProf.dob || prof.dob,
                 photoURL: cloudProf.photoURL || prof.photoURL,
@@ -340,7 +346,7 @@ export default function App() {
                 safeSetItem(`giriraj_profile_${scope}`, JSON.stringify(merged));
               }
               if (merged.phone) {
-                setUserPhone(merged.phone);
+                setUserPhone(cleanPhoneAutofill(merged.phone));
               }
               if (merged.name) {
                 setUserName(merged.name);
@@ -350,7 +356,7 @@ export default function App() {
           .catch((err) => {
             console.debug('[Supabase] Background profile fetch skipped/failed:', err);
           });
-        setUserPhone(phone || null);
+        setUserPhone(phone ? cleanPhoneAutofill(phone) : null);
         setUserName(name);
         setupUserSubscriptions(user.id);
       } else {
@@ -383,7 +389,7 @@ export default function App() {
         }
         const userMeta = user.user_metadata || {};
         const local = getSavedUserProfile(scope || undefined);
-        const phone = user.phone || userMeta.phone || local?.phone || '';
+        const phone = cleanPhoneAutofill(user.phone || userMeta.phone || local?.phone || '');
         const name = userMeta.full_name || userMeta.name || local?.name || (user.email ? user.email.split('@')[0] : 'Customer');
         const email = user.email || local?.email || '';
         const photoURL = userMeta.avatar_url || userMeta.picture || local?.photoURL || undefined;
@@ -404,12 +410,13 @@ export default function App() {
         fetchUserProfileFromSupabase(user.id)
           .then((cloudProf) => {
             if (cloudProf) {
+              const mergedPhone = cleanPhoneAutofill(cloudProf.phone || prof.phone);
               const merged: UserProfile = {
                 ...prof,
                 ...cloudProf,
                 id: user.id,
                 name: cloudProf.name || prof.name,
-                phone: cloudProf.phone || prof.phone,
+                phone: mergedPhone,
                 email: cloudProf.email || prof.email,
                 dob: cloudProf.dob || prof.dob,
                 photoURL: cloudProf.photoURL || prof.photoURL,
@@ -422,7 +429,7 @@ export default function App() {
                 safeSetItem(`giriraj_profile_${scope}`, JSON.stringify(merged));
               }
               if (merged.phone) {
-                setUserPhone(merged.phone);
+                setUserPhone(cleanPhoneAutofill(merged.phone));
               }
               if (merged.name) {
                 setUserName(merged.name);
@@ -432,7 +439,7 @@ export default function App() {
           .catch((err) => {
             console.debug('[Supabase] Background profile fetch skipped/failed:', err);
           });
-        setUserPhone(phone || null);
+        setUserPhone(phone ? cleanPhoneAutofill(phone) : null);
         setUserName(name);
         setupUserSubscriptions(user.id);
 
@@ -1507,8 +1514,8 @@ export default function App() {
         }}
       />
 
-      {/* Zomato-style Floating Map Route Circle Button for Current Active Order (Navigates directly to dedicated live order page) */}
-      {!location.pathname.startsWith('/live-order') && (
+      {/* Zomato-style Floating Map Route Circle Button for Current Active Order (Navigates directly to dedicated live order page, hidden on profile tab and profile sub-pages) */}
+      {!location.pathname.startsWith('/live-order') && !location.pathname.startsWith('/profile') && (
         <FloatingLiveOrderButton
           order={activeLiveOrder}
           onClick={() => navigate('/live-order')}

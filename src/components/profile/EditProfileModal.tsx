@@ -54,7 +54,7 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
     if (isOpen && !prevIsOpenRef.current) {
       setEditName(userProfile?.name || '');
       setEditEmail(userProfile?.email || '');
-      setEditPhone(userProfile?.phone || '');
+      setEditPhone(userProfile?.phone ? cleanPhoneAutofill(userProfile.phone) : '');
       setEditDob(userProfile?.dob || '');
       setEditPhotoURL(userProfile?.photoURL || '');
       setIsOtpStep(false);

@@ -1,6 +1,7 @@
 import React from 'react';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, Bell } from 'lucide-react';
 import { requestPushNotificationPermission } from '../../services/pushNotificationService';
+import { ThemeSettingsSection } from './ThemeSettingsSection';
 
 interface NotificationsSubPageProps {
   mobileAlerts: boolean;
@@ -35,11 +36,24 @@ export const NotificationsSubPage: React.FC<NotificationsSubPageProps> = ({
         >
           <ArrowLeft className="w-5 h-5" />
         </button>
-        <h1 className="text-lg font-black text-slate-900">Notifications</h1>
+        <h1 className="text-lg font-black text-slate-900">Setting</h1>
       </div>
 
       <div className="max-w-2xl mx-auto p-4 sm:p-6 space-y-4">
+        {/* Theme Settings Section directly on top of notification button in starting */}
+        <ThemeSettingsSection />
+
         <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-2xs space-y-5">
+          <div className="border-b border-slate-100 pb-2">
+            <h2 className="text-sm sm:text-base font-bold text-slate-900 leading-snug flex items-center gap-2">
+              <Bell className="w-4 h-4 text-emerald-600" />
+              <span>Notification Preferences</span>
+            </h2>
+            <p className="text-xs sm:text-[13px] text-slate-600 font-normal mt-0.5 leading-relaxed">
+              Manage order alerts, live rider location, and transaction notifications
+            </p>
+          </div>
+
           {/* Mobile Push Notifications */}
           <div className="flex items-center justify-between gap-4">
             <div className="flex-1 pr-2">
@@ -168,25 +182,6 @@ export const NotificationsSubPage: React.FC<NotificationsSubPageProps> = ({
                 }`}
               />
             </button>
-          </div>
-
-          {/* Account Security Login Alerts (Mandatory / Always Active for Protection) */}
-          <div className="flex items-center justify-between gap-4 pt-4 border-t border-slate-100 bg-emerald-50/60 -mx-5 -mb-5 p-5 rounded-b-2xl">
-            <div className="flex-1 pr-2">
-              <div className="flex items-center gap-1.5">
-                <span className="text-xs font-black uppercase tracking-wider px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 border border-emerald-300">
-                  🛡️ Active Security
-                </span>
-                <p className="text-sm font-bold text-slate-900 leading-snug">Sign-in &amp; Location Alerts</p>
-              </div>
-              <p className="text-xs text-slate-600 font-normal mt-1 leading-relaxed">
-                Instant email notification with timestamp, approximate location &amp; device details sent upon every login (Binance &amp; Uber style security protocol).
-              </p>
-            </div>
-            <div className="shrink-0 flex items-center gap-1 text-xs font-bold text-emerald-700 bg-white border border-emerald-200 px-2.5 py-1.5 rounded-lg shadow-2xs">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-              Enforced
-            </div>
           </div>
         </div>
       </div>

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
   ArrowLeft,
   HelpCircle,
@@ -6,7 +6,7 @@ import {
   CreditCard,
   Wallet,
   ChevronRight,
-  Bell,
+  Settings,
   LogOut,
   Calendar,
   Edit3,
@@ -24,7 +24,8 @@ import {
   deleteAddressFromFirestore,
   subscribeToUpiIds,
   fetchProductsFromSupabase,
-  fetchUserProfileFromSupabase
+  fetchUserProfileFromSupabase,
+  cleanPhoneAutofill
 } from '../services/supabaseService';
 import { getFavoriteProductIds, toggleProductFavorite, clearAllFavorites } from '../services/favorites';
 import { INITIAL_PRODUCTS } from '../data/products';
@@ -105,7 +106,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
             ...freshProf,
             id: userProfile.id,
             name: freshProf.name || userProfile.name,
-            phone: freshProf.phone || userProfile.phone,
+            phone: cleanPhoneAutofill(freshProf.phone || userProfile.phone || ''),
             email: freshProf.email || userProfile.email,
             dob: freshProf.dob !== undefined ? freshProf.dob : userProfile.dob,
             photoURL: freshProf.photoURL || userProfile.photoURL,
@@ -200,7 +201,20 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
   const hasAnyMissingDetails = hasMissingName || hasMissingPhone || hasMissingEmail;
 
   const displayName = rawName || 'Set Your Name';
-  const displayPhone = rawPhone;
+  // Deterministic phone formatting: prevents flickering between "+91", "91", and raw 10 digits
+  const displayPhone = useMemo(() => {
+    if (!rawPhone) return '';
+    const cleaned = cleanPhoneAutofill(rawPhone);
+    if (cleaned.length === 10) {
+      return `+91 ${cleaned}`;
+    }
+    const digits = rawPhone.replace(/\D/g, '');
+    if (digits.length >= 10) {
+      return `+91 ${digits.slice(-10)}`;
+    }
+    if (rawPhone.startsWith('+')) return rawPhone;
+    return `+91 ${digits || rawPhone}`;
+  }, [rawPhone]);
   const displayEmail = rawEmail;
 
   const getInitials = (name?: string, phone?: string, email?: string) => {
@@ -600,17 +614,17 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
             <ChevronRight className="w-5 h-5 text-slate-400 group-hover:text-slate-600 transition-colors" />
           </button>
 
-          {/* 6. Notifications */}
+          {/* 6. Setting */}
           <button
             onClick={() => setSubPage('notifications')}
             className="w-full p-4 sm:p-4.5 flex items-center justify-between hover:bg-slate-50/80 transition-colors text-left cursor-pointer group"
           >
             <div className="flex items-center gap-3.5 sm:gap-4">
               <div className="w-10 h-10 rounded-2xl bg-cyan-100 border border-cyan-200 text-cyan-600 flex items-center justify-center shrink-0 shadow-2xs group-hover:scale-105 transition-transform">
-                <Bell className="w-5 h-5" />
+                <Settings className="w-5 h-5" />
               </div>
               <div>
-                <p className="text-base sm:text-lg font-normal text-slate-800">Notifications</p>
+                <p className="text-base sm:text-lg font-normal text-slate-800">Setting</p>
               </div>
             </div>
             <ChevronRight className="w-5 h-5 text-slate-400 group-hover:text-slate-600 transition-colors" />

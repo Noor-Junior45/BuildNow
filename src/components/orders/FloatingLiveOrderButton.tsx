@@ -1,4 +1,5 @@
 import React from 'react';
+import { useLocation } from 'react-router-dom';
 import { MapPin } from 'lucide-react';
 import { Order } from '../../types';
 
@@ -11,9 +12,13 @@ export const FloatingLiveOrderButton: React.FC<FloatingLiveOrderButtonProps> = (
   order,
   onClick
 }) => {
-  // Condition: Only show when order exists and is NOT yet delivered or cancelled/failed
+  const location = useLocation();
+
+  // Condition: Only show when order exists, NOT on profile or live-order pages, and NOT yet delivered or cancelled/failed
   if (
     !order ||
+    location.pathname.startsWith('/profile') ||
+    location.pathname.startsWith('/live-order') ||
     order.status === 'delivered' ||
     order.status === 'cancelled' ||
     order.status === 'failed'
