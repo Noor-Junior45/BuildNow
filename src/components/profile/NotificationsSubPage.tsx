@@ -1,6 +1,7 @@
 import React from 'react';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, Bell } from 'lucide-react';
 import { requestPushNotificationPermission } from '../../services/pushNotificationService';
+import { RefundPolicy } from '../RefundPolicy';
 
 interface NotificationsSubPageProps {
   mobileAlerts: boolean;
@@ -12,6 +13,7 @@ interface NotificationsSubPageProps {
   onToggleSmsAlerts: (next: boolean) => void;
   onToggleEmailAlerts: (next: boolean) => void;
   onBack: () => void;
+  onContactSupport?: () => void;
 }
 
 export const NotificationsSubPage: React.FC<NotificationsSubPageProps> = ({
@@ -23,8 +25,10 @@ export const NotificationsSubPage: React.FC<NotificationsSubPageProps> = ({
   onToggleWhatsappAlerts,
   onToggleSmsAlerts,
   onToggleEmailAlerts,
-  onBack
+  onBack,
+  onContactSupport
 }) => {
+
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 pb-20">
       <div className="bg-white border-b border-slate-200 px-4 py-3.5 flex items-center gap-3 shadow-2xs">
@@ -170,7 +174,13 @@ export const NotificationsSubPage: React.FC<NotificationsSubPageProps> = ({
             </button>
           </div>
         </div>
+
+        {/* Razorpay Refund & Cancellation Transparency Policy */}
+        <div className="pt-2">
+          <RefundPolicy isEmbedded={true} onContactSupport={onContactSupport} />
+        </div>
       </div>
     </div>
   );
 };
+

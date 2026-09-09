@@ -344,6 +344,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
         onToggleSmsAlerts={setSmsAlerts}
         onToggleEmailAlerts={setEmailAlerts}
         onBack={() => setSubPage('main')}
+        onContactSupport={() => setSubPage('help')}
       />
     );
   }

@@ -85,7 +85,7 @@ export async function getRazorpayConfig(): Promise<RazorpayConfigResponse> {
       success: false,
       keyId: (import.meta.env.VITE_RAZORPAY_KEY_ID as string) || 'rzp_test_demo',
       isConfigured: false,
-      merchantName: 'Giriraj Power',
+      merchantName: 'BuildNow',
       currency: 'INR'
     };
   }
@@ -172,6 +172,124 @@ export async function initiateRazorpayRefund(
   return data;
 }
 
+function escapeHtml(str: string): string {
+  return String(str || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
+function showRazorpaySandboxModal(params: {
+  amount: number;
+  orderId: string;
+  customerName: string;
+  customerPhone: string;
+  customerEmail?: string;
+  description?: string;
+  onApprove: (response: RazorpayPaymentResponse) => void;
+  onReject: (error: Error) => void;
+}): void {
+  const existing = document.getElementById('rzp-sandbox-modal-container');
+  if (existing) existing.remove();
+
+  const container = document.createElement('div');
+  container.id = 'rzp-sandbox-modal-container';
+  container.className =
+    'fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-xs p-4';
+
+  container.innerHTML = `
+    <div class="bg-white w-full max-w-md rounded-2xl shadow-2xl overflow-hidden border border-slate-200 text-slate-900">
+      <!-- Header -->
+      <div class="bg-[#0c2340] text-white p-5">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-2">
+            <div class="w-7 h-7 rounded-lg bg-blue-500 text-white flex items-center justify-center font-black text-sm shadow-xs">
+              R
+            </div>
+            <div>
+              <span class="font-bold text-sm tracking-tight block">Razorpay Gateway</span>
+              <span class="text-[10px] text-blue-300 uppercase tracking-wider font-semibold">Test Sandbox Environment</span>
+            </div>
+          </div>
+          <button id="rzp-close-btn" class="text-white/60 hover:text-white p-1 rounded-lg transition-colors cursor-pointer" aria-label="Close">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+          </button>
+        </div>
+
+        <div class="mt-4 pt-3 border-t border-white/10 flex items-baseline justify-between">
+          <div class="text-xs text-white/80">BuildNow Kolkata</div>
+          <div class="text-xl font-black text-amber-300">₹${params.amount.toFixed(2)}</div>
+        </div>
+      </div>
+
+      <!-- Content -->
+      <div class="p-5 space-y-4">
+        <div class="bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs space-y-1.5">
+          <div class="flex justify-between text-slate-500">
+            <span>Customer:</span>
+            <span class="font-semibold text-slate-800">${escapeHtml(params.customerName)}</span>
+          </div>
+          <div class="flex justify-between text-slate-500">
+            <span>Phone:</span>
+            <span class="font-semibold text-slate-800">${escapeHtml(params.customerPhone)}</span>
+          </div>
+          <div class="flex justify-between text-slate-500">
+            <span>Order ID:</span>
+            <span class="font-mono text-[11px] font-semibold text-slate-700">${escapeHtml(params.orderId)}</span>
+          </div>
+        </div>
+
+        <div class="p-3 bg-blue-50/70 border border-blue-200 rounded-xl text-xs text-blue-900 flex items-start gap-2">
+          <svg class="w-4 h-4 text-blue-600 mt-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+          <div>
+            <p class="font-semibold">Razorpay Sandbox Active</p>
+            <p class="text-[11px] text-blue-800 mt-0.5">Simulate instant online payment clearance or test cancellation flow.</p>
+          </div>
+        </div>
+
+        <div class="space-y-2 pt-1">
+          <button id="rzp-simulate-success-btn" class="w-full py-3 px-4 rounded-xl bg-[#0c2340] hover:bg-[#13335c] active:bg-[#081729] text-white font-bold text-sm transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer">
+            <svg class="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+            Approve &amp; Pay ₹${params.amount.toFixed(2)}
+          </button>
+
+          <button id="rzp-simulate-fail-btn" class="w-full py-2.5 px-4 rounded-xl bg-slate-100 hover:bg-slate-200 active:bg-slate-300 text-slate-700 font-semibold text-xs transition-colors cursor-pointer">
+            Simulate Payment Failure
+          </button>
+        </div>
+      </div>
+    </div>
+  `;
+
+  document.body.appendChild(container);
+
+  function cleanup() {
+    container.remove();
+  }
+
+  document.getElementById('rzp-close-btn')?.addEventListener('click', () => {
+    cleanup();
+    params.onReject(new Error('Payment window was closed.'));
+  });
+
+  document.getElementById('rzp-simulate-fail-btn')?.addEventListener('click', () => {
+    cleanup();
+    params.onReject(new Error('Payment was cancelled by user.'));
+  });
+
+  document.getElementById('rzp-simulate-success-btn')?.addEventListener('click', () => {
+    cleanup();
+    const mockResponse: RazorpayPaymentResponse = {
+      razorpay_payment_id: `pay_test_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+      razorpay_order_id: params.orderId,
+      razorpay_signature: `sig_test_${Date.now()}`
+    };
+    params.onApprove(mockResponse);
+  });
+}
+
 export interface LaunchRazorpayCheckoutParams {
   amount: number;
   orderId?: string;
@@ -203,17 +321,14 @@ export async function launchRazorpayCheckout(
     customerName,
     customerPhone,
     customerEmail,
-    description = 'Giriraj Power Kolkata Express Order',
+    description = 'BuildNow Express Order',
     onSuccess,
     onFailure,
     onDismiss
   } = params;
 
-  // 1. Ensure Razorpay script is loaded
-  const isLoaded = await loadRazorpayScript();
-  if (!isLoaded && !(window as any).Razorpay) {
-    throw new Error('Razorpay checkout SDK could not be loaded. Please check your network connection.');
-  }
+  // 1. Try loading Razorpay script in background
+  await loadRazorpayScript().catch(() => false);
 
   // 2. Create server-side order
   const serverOrder = await createRazorpayOrder(amount, `rcpt_${Date.now()}`, {
@@ -224,70 +339,104 @@ export async function launchRazorpayCheckout(
   const config = await getRazorpayConfig();
   const effectiveKeyId = serverOrder.keyId || config.keyId;
 
+  const isRealRazorpayKey = Boolean(
+    effectiveKeyId &&
+    (effectiveKeyId.startsWith('rzp_live_') || effectiveKeyId.startsWith('rzp_test_')) &&
+    !effectiveKeyId.includes('sandbox') &&
+    !effectiveKeyId.includes('placeholder') &&
+    !effectiveKeyId.includes('demo') &&
+    effectiveKeyId.length >= 14
+  );
+
   return new Promise<RazorpayCheckoutResult>((resolve, reject) => {
-    // 3. Open Razorpay modal
-    const options = {
-      key: effectiveKeyId,
-      amount: serverOrder.amount, // in paise
-      currency: serverOrder.currency || 'INR',
-      name: 'Giriraj Power',
-      description,
-      image: '/smartrun.jpeg',
-      order_id: serverOrder.isLive ? serverOrder.orderId : undefined, // pass order_id if live order was created
-      prefill: {
-        name: customerName,
-        contact: customerPhone.replace(/\D/g, '').slice(-10),
-        email: customerEmail || ''
-      },
-      notes: {
-        merchant: 'Giriraj Power Store Kasba Kolkata',
-        address: 'Kasba Kolkata, WB'
-      },
-      theme: {
-        color: '#8B0000', // Giriraj brand crimson
-        backdrop_color: 'rgba(15, 23, 42, 0.75)'
-      },
-      handler: async function (response: RazorpayPaymentResponse) {
-        try {
-          // Cryptographic verification on server
-          const verification = await verifyRazorpayPayment(response, serverOrder.orderId);
-          if (verification.verified) {
-            const result: RazorpayCheckoutResult = {
-              paymentId: response.razorpay_payment_id,
-              orderId: response.razorpay_order_id,
-              signature: response.razorpay_signature
-            };
-            if (onSuccess) onSuccess(response);
-            resolve(result);
-          } else {
-            const err = new Error(verification.message || 'Payment signature verification failed.');
-            if (onFailure) onFailure(err);
-            reject(err);
-          }
-        } catch (verErr) {
-          if (onFailure) onFailure(verErr);
-          reject(verErr);
+    const handleApproved = async (response: RazorpayPaymentResponse) => {
+      try {
+        // Cryptographic verification on server
+        const verification = await verifyRazorpayPayment(response, serverOrder.orderId);
+        if (verification.verified) {
+          const result: RazorpayCheckoutResult = {
+            paymentId: response.razorpay_payment_id,
+            orderId: response.razorpay_order_id,
+            signature: response.razorpay_signature
+          };
+          if (onSuccess) onSuccess(response);
+          resolve(result);
+        } else {
+          const err = new Error(verification.message || 'Payment signature verification failed.');
+          if (onFailure) onFailure(err);
+          reject(err);
         }
-      },
-      modal: {
-        ondismiss: function () {
-          if (onDismiss) onDismiss();
-          reject(new Error('Payment window was closed.'));
-        },
-        confirm_close: true,
-        animation: true
+      } catch (verErr) {
+        if (onFailure) onFailure(verErr);
+        reject(verErr);
       }
     };
 
-    const rzp = new (window as any).Razorpay(options);
+    // If server created a live order and keys are valid, open the real Razorpay checkout popup
+    if (serverOrder.isLive && isRealRazorpayKey && (window as any).Razorpay) {
+      try {
+        const options = {
+          key: effectiveKeyId,
+          amount: serverOrder.amount, // in paise
+          currency: serverOrder.currency || 'INR',
+          name: 'BuildNow',
+          description,
+          image: '/smartrun.jpeg',
+          order_id: serverOrder.orderId,
+          prefill: {
+            name: customerName,
+            contact: customerPhone.replace(/\D/g, '').slice(-10),
+            email: customerEmail || ''
+          },
+          notes: {
+            merchant: 'BuildNow Store Kolkata',
+            address: 'Kolkata, WB'
+          },
+          theme: {
+            color: '#8B0000', // Giriraj brand crimson
+            backdrop_color: 'rgba(15, 23, 42, 0.75)'
+          },
+          handler: handleApproved,
+          modal: {
+            ondismiss: function () {
+              if (onDismiss) onDismiss();
+              reject(new Error('Payment window was closed.'));
+            },
+            confirm_close: true,
+            animation: true
+          }
+        };
 
-    rzp.on('payment.failed', function (resp: any) {
-      console.error('Razorpay payment failed:', resp.error);
-      const err = new Error(resp.error?.description || 'Razorpay payment failed.');
-      if (onFailure) onFailure(err);
-      reject(err);
+        const rzp = new (window as any).Razorpay(options);
+
+        rzp.on('payment.failed', function (resp: any) {
+          console.error('Razorpay payment failed:', resp.error);
+          const err = new Error(resp.error?.description || 'Razorpay payment failed.');
+          if (onFailure) onFailure(err);
+          reject(err);
+        });
+
+        rzp.open();
+        return;
+      } catch (openErr) {
+        console.warn('Failed to open Razorpay modal, falling back to sandbox UI:', openErr);
+      }
+    }
+
+    // Sandbox / Test fallback modal
+    showRazorpaySandboxModal({
+      amount,
+      orderId: serverOrder.orderId,
+      customerName,
+      customerPhone,
+      customerEmail,
+      description,
+      onApprove: handleApproved,
+      onReject: (err) => {
+        if (onDismiss && err.message.includes('closed')) onDismiss();
+        if (onFailure && !err.message.includes('closed')) onFailure(err);
+        reject(err);
+      }
     });
-
-    rzp.open();
   });
 }
