@@ -220,9 +220,12 @@ export const LiveOrderPage: React.FC<LiveOrderPageProps> = ({
     : 0;
 
   const deliveryFee = order?.deliveryFee ?? 0;
-  const handlingFee = order?.handlingFee ?? ((order as any)?.fees ?? 0);
+  const handlingFee = order?.handlingFee ?? 0;
+  const rainFee = (order as any)?.rainFee ?? order?.feeBreakdown?.rainFee ?? 0;
+  const surgeFee = (order as any)?.surgeFee ?? order?.feeBreakdown?.surgeFee ?? 0;
+  const productHandlingFee = (order as any)?.productHandlingFee ?? order?.feeBreakdown?.totalProductCharges ?? 0;
   const discount = order?.discount ?? ((order as any)?.discountAmount ?? 0);
-  const totalAmount = order?.totalAmount || itemsSubtotal + deliveryFee + handlingFee - discount;
+  const totalAmount = order?.totalAmount || itemsSubtotal + deliveryFee + handlingFee + rainFee + surgeFee + productHandlingFee - discount;
 
   const orderNumber =
     order?.id && order.id.length > 8 ? order.id.slice(-6).toUpperCase() : order?.id || 'ORDER';
@@ -791,6 +794,36 @@ export const LiveOrderPage: React.FC<LiveOrderPageProps> = ({
                   {deliveryFee === 0 ? 'FREE' : `₹${deliveryFee.toLocaleString('en-IN')}`}
                 </span>
               </div>
+
+              {rainFee > 0 && (
+                <div className="flex items-center justify-between text-sky-700">
+                  <span className="flex items-center gap-1">
+                    <span>🌧️</span>
+                    <span>Rain / Weather Fee:</span>
+                  </span>
+                  <span className="font-semibold">₹{rainFee.toLocaleString('en-IN')}</span>
+                </div>
+              )}
+
+              {surgeFee > 0 && (
+                <div className="flex items-center justify-between text-amber-700">
+                  <span className="flex items-center gap-1">
+                    <span>⚡</span>
+                    <span>Peak Surge Fee:</span>
+                  </span>
+                  <span className="font-semibold">₹{surgeFee.toLocaleString('en-IN')}</span>
+                </div>
+              )}
+
+              {productHandlingFee > 0 && (
+                <div className="flex items-center justify-between text-slate-600">
+                  <span className="flex items-center gap-1">
+                    <span>📦</span>
+                    <span>Special Product Charges:</span>
+                  </span>
+                  <span className="font-semibold text-slate-900">₹{productHandlingFee.toLocaleString('en-IN')}</span>
+                </div>
+              )}
 
               {handlingFee > 0 && (
                 <div className="flex items-center justify-between text-slate-600">

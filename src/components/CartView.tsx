@@ -34,10 +34,11 @@ import {
   X,
   Building2
 } from 'lucide-react';
-import { CartItem, KolkataArea, Order, SavedAddress, Product, UserProfile } from '../types';
+import { CartItem, KolkataArea, Order, SavedAddress, Product, UserProfile, FeePolicySettings } from '../types';
 import { SwipeableItem } from './SwipeableItem';
 import { createFirestoreOrder, getStoredAddresses, cleanPhoneAutofill, generateUUID } from '../services/supabaseService';
 import { notifyOrderPlaced } from '../services/emailService';
+import { getFeeSettings, calculateOrderFees, DEFAULT_FEE_SETTINGS } from '../services/feeService';
 import { INDIAN_STANDARD_WIRE_COLORS, PIPE_COLOR_OPTIONS, getProductColorOptions } from '../data/wireColors';
 import { trackBeginCheckout, trackPurchase } from '../utils/analytics';
 import {
@@ -130,6 +131,14 @@ export const CartView: React.FC<CartViewProps> = ({
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
   const [checkoutMode, setCheckoutMode] = useState<'all' | 'single'>('all');
   const [singleCheckoutItem, setSingleCheckoutItem] = useState<CartItem | null>(null);
+  const [feeSettings, setFeeSettings] = useState<FeePolicySettings>(DEFAULT_FEE_SETTINGS);
+
+  // Fetch dynamic fee policy from backend on mount
+  useEffect(() => {
+    getFeeSettings().then((res) => {
+      if (res) setFeeSettings(res);
+    });
+  }, []);
 
   // Derive the active/effective saved address
   const effectiveAddress = useMemo(() => {
@@ -262,10 +271,18 @@ export const CartView: React.FC<CartViewProps> = ({
   }, [activeItemsForBill]);
 
   const totalProductDiscount = Math.max(0, totalMRP - totalSellingPrice);
-  const deliveryFee = totalSellingPrice >= 499 || totalSellingPrice === 0 ? 0 : 49;
-  const handlingFee = activeItemsForBill.length > 0 ? 9 : 0; // Flat ₹9 standard handling fee
+  const feeBreakdown = useMemo(() => {
+    return calculateOrderFees(activeItemsForBill, feeSettings);
+  }, [activeItemsForBill, feeSettings]);
+
+  const deliveryFee = feeBreakdown.deliveryFee;
+  const handlingFee = feeBreakdown.handlingFee;
+  const rainFee = feeBreakdown.rainFee;
+  const surgeFee = feeBreakdown.surgeFee;
+  const productHandlingFee = feeBreakdown.totalProductCharges;
+  const fees = feeBreakdown.totalFees;
   const totalSavings = totalProductDiscount + discountApplied;
-  const finalTotalAmount = Math.max(0, totalSellingPrice + deliveryFee + handlingFee - discountApplied);
+  const finalTotalAmount = Math.max(0, totalSellingPrice + fees - discountApplied);
 
   // Track Begin Checkout
   useEffect(() => {
@@ -542,7 +559,11 @@ export const CartView: React.FC<CartViewProps> = ({
       subtotal,
       deliveryFee,
       handlingFee,
+      rainFee,
+      surgeFee,
+      productHandlingFee,
       fees,
+      feeBreakdown,
       discount: discountAmount,
       discountAmount,
       couponCode,
@@ -1178,9 +1199,46 @@ export const CartView: React.FC<CartViewProps> = ({
                 <div className="flex justify-between">
                   <span>Delivery Fee:</span>
                   <span className="font-semibold text-slate-800">
-                    {deliveryFee === 0 ? <span className="text-emerald-700 font-bold uppercase">FREE</span> : `₹${deliveryFee}`}
+                    {deliveryFee === 0 ? (
+                      <span className="text-emerald-700 font-bold uppercase">FREE</span>
+                    ) : (
+                      `₹${deliveryFee}`
+                    )}
                   </span>
                 </div>
+                {rainFee > 0 && (
+                  <div className="flex justify-between text-sky-700 font-medium">
+                    <span className="flex items-center gap-1.5">
+                      <span>🌧️</span>
+                      <span>{feeSettings.rainFee?.label || 'Rain Weather Fee'}:</span>
+                    </span>
+                    <span className="font-semibold">₹{rainFee}</span>
+                  </div>
+                )}
+                {surgeFee > 0 && (
+                  <div className="flex justify-between text-amber-700 font-medium">
+                    <span className="flex items-center gap-1.5">
+                      <span>⚡</span>
+                      <span>{feeSettings.surgeFee?.label || 'Peak Surge Fee'}:</span>
+                    </span>
+                    <span className="font-semibold">₹{surgeFee}</span>
+                  </div>
+                )}
+                {productHandlingFee > 0 && (
+                  <div className="flex justify-between text-slate-700">
+                    <span className="flex items-center gap-1.5">
+                      <span>📦</span>
+                      <span>Special Product Charges:</span>
+                    </span>
+                    <span className="font-semibold text-slate-800">₹{productHandlingFee}</span>
+                  </div>
+                )}
+                {feeBreakdown.customFees.map((cf) => (
+                  <div key={cf.id} className="flex justify-between text-slate-700">
+                    <span>{cf.label}:</span>
+                    <span className="font-semibold text-slate-800">₹{cf.amount}</span>
+                  </div>
+                ))}
                 <div className="flex justify-between">
                   <span>Handling Charges:</span>
                   <span className="font-semibold text-slate-800">₹{handlingFee}</span>

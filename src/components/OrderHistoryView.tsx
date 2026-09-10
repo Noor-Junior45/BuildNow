@@ -625,7 +625,10 @@ export const OrderHistoryView: React.FC<OrderHistoryViewProps> = ({
 
     const gstAmount = Math.round((itemsSubtotal * 18) / 118);
     const deliveryFee = selectedOrder.deliveryFee ?? 0;
-    const handlingFee = 0; // Free handling charges
+    const handlingFee = selectedOrder.handlingFee ?? 0;
+    const rainFee = (selectedOrder as any).rainFee ?? selectedOrder.feeBreakdown?.rainFee ?? 0;
+    const surgeFee = (selectedOrder as any).surgeFee ?? selectedOrder.feeBreakdown?.surgeFee ?? 0;
+    const productHandlingFee = (selectedOrder as any).productHandlingFee ?? selectedOrder.feeBreakdown?.totalProductCharges ?? 0;
     const discount = selectedOrder.discount ?? 0;
 
     const cancellationState = getOrderCancellationState(selectedOrder);
@@ -837,6 +840,36 @@ export const OrderHistoryView: React.FC<OrderHistoryViewProps> = ({
               {deliveryFee === 0 ? 'FREE' : `₹${deliveryFee.toLocaleString('en-IN')}`}
             </span>
           </div>
+
+          {rainFee > 0 && (
+            <div className="flex items-center justify-between text-sky-700">
+              <span className="flex items-center gap-1">
+                <span>🌧️</span>
+                <span>Rain / Weather Surcharge:</span>
+              </span>
+              <span className="font-semibold">₹{rainFee.toLocaleString('en-IN')}</span>
+            </div>
+          )}
+
+          {surgeFee > 0 && (
+            <div className="flex items-center justify-between text-amber-700">
+              <span className="flex items-center gap-1">
+                <span>⚡</span>
+                <span>Peak Surge Fee:</span>
+              </span>
+              <span className="font-semibold">₹{surgeFee.toLocaleString('en-IN')}</span>
+            </div>
+          )}
+
+          {productHandlingFee > 0 && (
+            <div className="flex items-center justify-between text-slate-700">
+              <span className="flex items-center gap-1">
+                <span>📦</span>
+                <span>Special Product Charges:</span>
+              </span>
+              <span className="font-semibold">₹{productHandlingFee.toLocaleString('en-IN')}</span>
+            </div>
+          )}
 
           <div className="flex items-center justify-between">
             <span>GST (18% Included):</span>

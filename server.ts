@@ -788,6 +788,21 @@ function generateAdminOrderAlertHtml(order: any): string {
             <td style="color: #64748b; padding-bottom: 6px;">Delivery Fee:</td>
             <td style="color: #16a34a; font-weight: 700; text-align: right; padding-bottom: 6px;">${(order.deliveryFee || 0) === 0 ? 'FREE' : '₹' + order.deliveryFee}</td>
           </tr>
+          ${(order.rainFee || 0) > 0 ? `
+          <tr>
+            <td style="color: #64748b; padding-bottom: 6px;">🌧️ Rain / Weather Fee:</td>
+            <td style="color: #0284c7; font-weight: 700; text-align: right; padding-bottom: 6px;">₹${order.rainFee}</td>
+          </tr>` : ''}
+          ${(order.surgeFee || 0) > 0 ? `
+          <tr>
+            <td style="color: #64748b; padding-bottom: 6px;">⚡ Peak Surge Fee:</td>
+            <td style="color: #d97706; font-weight: 700; text-align: right; padding-bottom: 6px;">₹${order.surgeFee}</td>
+          </tr>` : ''}
+          ${(order.productHandlingFee || 0) > 0 ? `
+          <tr>
+            <td style="color: #64748b; padding-bottom: 6px;">📦 Special Product Surcharge:</td>
+            <td style="color: #475569; font-weight: 700; text-align: right; padding-bottom: 6px;">₹${order.productHandlingFee}</td>
+          </tr>` : ''}
           ${(order.discount || 0) > 0 ? `
           <tr>
             <td style="color: #16a34a; padding-bottom: 6px;">Discount Applied:</td>
@@ -1189,6 +1204,11 @@ const OrderCheckoutSchema = z.object({
   itemTotal: z.number().nonnegative("Item total must be positive"),
   deliveryFee: z.number().nonnegative("Delivery fee cannot be negative"),
   handlingFee: z.number().nonnegative().optional().default(0),
+  rainFee: z.number().nonnegative().optional().default(0),
+  surgeFee: z.number().nonnegative().optional().default(0),
+  productHandlingFee: z.number().nonnegative().optional().default(0),
+  fees: z.number().nonnegative().optional().default(0),
+  feeBreakdown: z.any().optional().nullable(),
   discount: z.number().nonnegative().optional().default(0),
   totalAmount: z.number().nonnegative("Total amount must be positive"),
   paymentMethod: z.enum(["cod", "upi", "card"]).default("cod"),
@@ -1829,6 +1849,294 @@ async function startServer() {
   });
 
   // =========================================================================
+  // DYNAMIC FEE POLICY & CHARGES ENGINE
+  // =========================================================================
+  interface ServerFeePolicy {
+    freeDeliveryThreshold: number; // e.g. 499 (>= threshold => free delivery)
+    baseDeliveryFee: number; // e.g. 49 (< threshold => base delivery fee)
+    handlingFee: number; // e.g. 9
+    rainFee: {
+      enabled: boolean;
+      amount: number; // e.g. 20
+      label?: string;
+    };
+    surgeFee: {
+      enabled: boolean;
+      amount: number; // e.g. 15
+      label?: string;
+    };
+    customFees: Array<{
+      id: string;
+      label: string;
+      amount: number;
+      enabled: boolean;
+    }>;
+    productCharges: Record<string, number>; // map of productId -> fee
+    productChargeMode: "per_item" | "per_unique_product";
+    updatedAt: string;
+    updatedBy: string;
+  }
+
+  const FEE_SETTINGS_FILE = path.join(process.cwd(), "data", "fee-settings.json");
+
+  const DEFAULT_FEE_POLICY: ServerFeePolicy = {
+    freeDeliveryThreshold: 499,
+    baseDeliveryFee: 49,
+    handlingFee: 9,
+    rainFee: {
+      enabled: false,
+      amount: 20,
+      label: "Rain / Weather Surcharge"
+    },
+    surgeFee: {
+      enabled: false,
+      amount: 15,
+      label: "Peak Demand Surge"
+    },
+    customFees: [],
+    productCharges: {},
+    productChargeMode: "per_item",
+    updatedAt: new Date().toISOString(),
+    updatedBy: "system"
+  };
+
+  let serverFeePolicyCache: ServerFeePolicy | null = null;
+
+  function getServerFeePolicy(): ServerFeePolicy {
+    if (serverFeePolicyCache) return serverFeePolicyCache;
+    try {
+      if (fs.existsSync(FEE_SETTINGS_FILE)) {
+        const raw = fs.readFileSync(FEE_SETTINGS_FILE, "utf-8");
+        const parsed = JSON.parse(raw);
+        serverFeePolicyCache = {
+          ...DEFAULT_FEE_POLICY,
+          ...parsed,
+          rainFee: { ...DEFAULT_FEE_POLICY.rainFee, ...(parsed.rainFee || {}) },
+          surgeFee: { ...DEFAULT_FEE_POLICY.surgeFee, ...(parsed.surgeFee || {}) },
+          productCharges: parsed.productCharges || {},
+          customFees: Array.isArray(parsed.customFees) ? parsed.customFees : []
+        };
+        return serverFeePolicyCache!;
+      }
+    } catch (err) {
+      console.warn("[FeePolicy] Read file warning:", err);
+    }
+    serverFeePolicyCache = { ...DEFAULT_FEE_POLICY };
+    return serverFeePolicyCache;
+  }
+
+  function updateServerFeePolicy(patch: Partial<ServerFeePolicy>, updatedBy = "backend_app"): ServerFeePolicy {
+    const current = getServerFeePolicy();
+    const updated: ServerFeePolicy = {
+      ...current,
+      ...patch,
+      rainFee: patch.rainFee ? { ...current.rainFee, ...patch.rainFee } : current.rainFee,
+      surgeFee: patch.surgeFee ? { ...current.surgeFee, ...patch.surgeFee } : current.surgeFee,
+      productCharges: patch.productCharges ? { ...current.productCharges, ...patch.productCharges } : current.productCharges,
+      customFees: patch.customFees !== undefined ? patch.customFees : current.customFees,
+      updatedAt: new Date().toISOString(),
+      updatedBy
+    };
+
+    serverFeePolicyCache = updated;
+
+    try {
+      const dir = path.dirname(FEE_SETTINGS_FILE);
+      if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+      fs.writeFileSync(FEE_SETTINGS_FILE, JSON.stringify(updated, null, 2), "utf-8");
+    } catch (err) {
+      console.error("[FeePolicy] Failed to write fee-settings.json:", err);
+    }
+
+    // Async backup to Supabase table `app_settings` if available
+    const sb = getServerSupabase();
+    if (sb) {
+      sb.from("app_settings")
+        .upsert({ key: "fee_policy", value: updated, updated_at: new Date().toISOString() })
+        .then(({ error }: any) => {
+          if (error && !error.message?.includes("does not exist")) {
+            console.warn("[FeePolicy] Supabase backup notice:", error.message);
+          }
+        })
+        .catch(() => {});
+    }
+
+    return updated;
+  }
+
+  function computeOrderCharges(
+    items: Array<any>,
+    claimedSubtotal?: number,
+    policy = getServerFeePolicy()
+  ) {
+    const activeItems = Array.isArray(items) ? items.filter((it) => it && (it.quantity || 0) > 0) : [];
+    
+    const computedSubtotal = activeItems.reduce((sum, it) => {
+      const price = typeof it.product?.price === "number" ? it.product.price : (Number(it.price) || 0);
+      return sum + price * (it.quantity || 1);
+    }, 0);
+
+    const subtotal = typeof claimedSubtotal === "number" && claimedSubtotal > 0 ? claimedSubtotal : computedSubtotal;
+
+    const threshold = Number(policy.freeDeliveryThreshold ?? 499);
+    const baseDeliveryFee = Number(policy.baseDeliveryFee ?? 49);
+    const isFreeDelivery = subtotal >= threshold || activeItems.length === 0;
+    const deliveryFee = isFreeDelivery ? 0 : baseDeliveryFee;
+    const handlingFee = activeItems.length > 0 ? Number(policy.handlingFee ?? 9) : 0;
+    const rainFee = (policy.rainFee?.enabled && activeItems.length > 0) ? Math.max(0, Number(policy.rainFee?.amount || 0)) : 0;
+    const surgeFee = (policy.surgeFee?.enabled && activeItems.length > 0) ? Math.max(0, Number(policy.surgeFee?.amount || 0)) : 0;
+
+    // Per-Product Specific Charges
+    const productChargesMap = policy.productCharges || {};
+    const chargeMode = policy.productChargeMode || "per_item";
+    const productCharges: Array<{ productId: string; name: string; unitCharge: number; quantity: number; totalCharge: number }> = [];
+    let totalProductCharges = 0;
+
+    for (const it of activeItems) {
+      const pId = String(it.product?.id || it.productId || it.id || "");
+      const unitCharge = productChargesMap[pId] !== undefined
+        ? Number(productChargesMap[pId])
+        : Number(it.product?.deliveryCharge ?? it.deliveryCharge ?? it.product?.handlingCharge ?? 0);
+      
+      if (unitCharge > 0) {
+        const q = it.quantity || 1;
+        const lineTotal = chargeMode === "per_item" ? unitCharge * q : unitCharge;
+        totalProductCharges += lineTotal;
+        productCharges.push({
+          productId: pId,
+          name: it.product?.name || it.name || "Product",
+          unitCharge,
+          quantity: q,
+          totalCharge: lineTotal
+        });
+      }
+    }
+
+    // Custom Fees
+    let totalCustomFees = 0;
+    const customFeesApplied: Array<{ id: string; label: string; amount: number }> = [];
+    if (Array.isArray(policy.customFees) && activeItems.length > 0) {
+      for (const cf of policy.customFees) {
+        if (cf.enabled && Number(cf.amount) > 0) {
+          customFeesApplied.push({ id: cf.id, label: cf.label, amount: Number(cf.amount) });
+          totalCustomFees += Number(cf.amount);
+        }
+      }
+    }
+
+    const totalFees = deliveryFee + handlingFee + rainFee + surgeFee + totalProductCharges + totalCustomFees;
+    const grandTotal = Math.max(0, subtotal + totalFees);
+
+    return {
+      subtotal,
+      freeDeliveryThreshold: threshold,
+      isFreeDelivery,
+      deliveryFee,
+      baseDeliveryFee,
+      handlingFee,
+      rainFee,
+      rainFeeActive: Boolean(policy.rainFee?.enabled),
+      surgeFee,
+      surgeFeeActive: Boolean(policy.surgeFee?.enabled),
+      productCharges,
+      totalProductCharges,
+      customFees: customFeesApplied,
+      totalCustomFees,
+      totalFees,
+      grandTotal
+    };
+  }
+
+  // GET /api/fee-settings -> Retrieve current fee policy & charges settings
+  app.get("/api/fee-settings", (req, res) => {
+    res.setHeader("Cache-Control", "no-cache, must-revalidate");
+    return res.json({
+      success: true,
+      settings: getServerFeePolicy()
+    });
+  });
+
+  // POST /api/fee-settings -> Update fee policy from backend app / admin listing
+  app.post("/api/fee-settings", (req, res) => {
+    try {
+      const body = req.body || {};
+      const updatedBy = req.headers["x-client-id"] || req.headers["x-user-email"] || "backend_app";
+      
+      // If adding/updating a single product charge: { productId, charge }
+      if (body.productId && (typeof body.charge === "number" || typeof body.productCharge === "number")) {
+        const prodId = String(body.productId);
+        const charge = Number(body.charge ?? body.productCharge);
+        const current = getServerFeePolicy();
+        const nextProductCharges = { ...current.productCharges };
+        if (charge <= 0) {
+          delete nextProductCharges[prodId];
+        } else {
+          nextProductCharges[prodId] = charge;
+        }
+        const updated = updateServerFeePolicy({ productCharges: nextProductCharges }, String(updatedBy));
+        return res.json({
+          success: true,
+          message: `Product ${prodId} charge set to ₹${charge}`,
+          settings: updated
+        });
+      }
+
+      // If removing a product charge: { removeProductId: "xyz" }
+      if (body.removeProductId) {
+        const prodId = String(body.removeProductId);
+        const current = getServerFeePolicy();
+        const nextProductCharges = { ...current.productCharges };
+        delete nextProductCharges[prodId];
+        const updated = updateServerFeePolicy({ productCharges: nextProductCharges }, String(updatedBy));
+        return res.json({
+          success: true,
+          message: `Product ${prodId} charge removed`,
+          settings: updated
+        });
+      }
+
+      const updated = updateServerFeePolicy(body, String(updatedBy));
+      return res.json({
+        success: true,
+        message: "Fee policy and charges settings updated successfully",
+        settings: updated
+      });
+    } catch (err: any) {
+      return res.status(500).json({ success: false, message: err?.message || "Failed to update fee settings" });
+    }
+  });
+
+  // PUT /api/fee-settings (alias)
+  app.put("/api/fee-settings", (req, res) => {
+    try {
+      const body = req.body || {};
+      const updatedBy = req.headers["x-client-id"] || req.headers["x-user-email"] || "backend_app";
+      const updated = updateServerFeePolicy(body, String(updatedBy));
+      return res.json({
+        success: true,
+        message: "Fee policy and charges settings updated successfully",
+        settings: updated
+      });
+    } catch (err: any) {
+      return res.status(500).json({ success: false, message: err?.message || "Failed to update fee settings" });
+    }
+  });
+
+  // POST /api/cart/calculate-charges -> Calculates exact charges breakdown for cart items
+  app.post("/api/cart/calculate-charges", (req, res) => {
+    try {
+      const { items = [], subtotal } = req.body || {};
+      const breakdown = computeOrderCharges(items, subtotal);
+      return res.json({
+        success: true,
+        breakdown
+      });
+    } catch (err: any) {
+      return res.status(500).json({ success: false, message: err?.message || "Failed to calculate charges" });
+    }
+  });
+
+  // =========================================================================
   // SECURE & IDEMPOTENT ORDER CHECKOUT PIPELINE
   // =========================================================================
   app.post("/api/order", orderCheckoutLimiter, async (req, res) => {
@@ -1864,16 +2172,29 @@ async function startServer() {
 
       const validatedOrder = parseResult.data;
 
-      // 2.1 Server-side price validation to prevent tampered totals
+      // 2.1 Server-side dynamic price & fee policy validation
       const computedItemTotal = validatedOrder.items.reduce((sum, it) => {
         const itemPrice = typeof it.product?.price === "number" ? it.product.price : 0;
         return sum + itemPrice * (it.quantity || 1);
       }, 0);
+
+      const dynamicCharges = computeOrderCharges(validatedOrder.items, computedItemTotal);
+
+      // Support submitted fees or server dynamic policy fees
+      const effectiveDeliveryFee = validatedOrder.deliveryFee ?? dynamicCharges.deliveryFee;
+      const effectiveHandlingFee = validatedOrder.handlingFee ?? dynamicCharges.handlingFee;
+      const effectiveRainFee = validatedOrder.rainFee ?? dynamicCharges.rainFee;
+      const effectiveSurgeFee = validatedOrder.surgeFee ?? dynamicCharges.surgeFee;
+      const effectiveProductFee = validatedOrder.productHandlingFee ?? dynamicCharges.totalProductCharges;
+
       const computedGrandTotal = Math.max(
         0,
         computedItemTotal +
-          (validatedOrder.deliveryFee || 0) +
-          (validatedOrder.handlingFee || 0) -
+          effectiveDeliveryFee +
+          effectiveHandlingFee +
+          effectiveRainFee +
+          effectiveSurgeFee +
+          effectiveProductFee -
           (validatedOrder.discount || 0)
       );
 
@@ -1924,8 +2245,12 @@ async function startServer() {
               items: formattedServerItems,
               item_total: validatedOrder.itemTotal,
               subtotal: validatedOrder.itemTotal,
-              delivery_fee: validatedOrder.deliveryFee,
-              handling_fee: validatedOrder.handlingFee,
+              delivery_fee: effectiveDeliveryFee,
+              handling_fee: effectiveHandlingFee,
+              rain_fee: effectiveRainFee,
+              surge_fee: effectiveSurgeFee,
+              fees: (effectiveDeliveryFee + effectiveHandlingFee + effectiveRainFee + effectiveSurgeFee + effectiveProductFee),
+              fee_breakdown: validatedOrder.feeBreakdown || dynamicCharges,
               discount: validatedOrder.discount,
               total_amount: validatedOrder.totalAmount,
               payment_method: validatedOrder.paymentMethod,
@@ -3715,6 +4040,9 @@ Tone: direct, confident, objective. Output ONLY the single sentence. No quotatio
         `🛒 *ORDERED ITEMS & QUANTITIES:*\n${itemsListText}\n\n` +
         `💰 *Item Total:* ₹${(order.itemTotal || 0).toLocaleString('en-IN')}\n` +
         `🚚 *Delivery Fee:* ${(order.deliveryFee || 0) === 0 ? 'FREE (Express)' : '₹' + order.deliveryFee}\n` +
+        `${(order.rainFee || 0) > 0 ? `🌧️ *Rain Surcharge:* ₹${order.rainFee}\n` : ''}` +
+        `${(order.surgeFee || 0) > 0 ? `⚡ *Peak Surge:* ₹${order.surgeFee}\n` : ''}` +
+        `${(order.productHandlingFee || 0) > 0 ? `📦 *Product Surcharge:* ₹${order.productHandlingFee}\n` : ''}` +
         `${(order.discount || 0) > 0 ? `🎟️ *Discount:* -₹${order.discount}\n` : ''}` +
         `💳 *GRAND TOTAL:* ₹${(order.totalAmount || 0).toLocaleString('en-IN')}\n` +
         `💵 *Payment Mode:* ${order.paymentMethod === 'cod' ? 'Cash on Delivery (COD)' : 'Online UPI / Card (PAID)'}\n\n` +

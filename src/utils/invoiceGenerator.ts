@@ -33,6 +33,10 @@ export async function downloadInvoicePDF(order: Order): Promise<void> {
   const gstAmount = Math.round((itemsSubtotal * 0.18) * 10) / 10;
   const rawSubtotal = Math.round((itemsSubtotal - gstAmount) * 10) / 10;
   const deliveryFee = order.deliveryFee || 0;
+  const rainFee = (order as any).rainFee || order.feeBreakdown?.rainFee || 0;
+  const surgeFee = (order as any).surgeFee || order.feeBreakdown?.surgeFee || 0;
+  const productHandlingFee = (order as any).productHandlingFee || order.feeBreakdown?.totalProductCharges || 0;
+  const handlingFee = order.handlingFee || 0;
   const discountAmount = order.discount || 0;
   const totalAmount = order.totalAmount;
 
@@ -218,6 +222,30 @@ export async function downloadInvoicePDF(order: Order): Promise<void> {
                 ${deliveryFee > 0 ? `₹${deliveryFee.toLocaleString('en-IN')}` : 'FREE Delivery'}
               </strong>
             </div>
+            ${rainFee > 0 ? `
+              <div style="display: flex; justify-content: space-between; color: #0284c7;">
+                <span>🌧️ Rain / Weather Surcharge:</span>
+                <strong>₹${rainFee.toLocaleString('en-IN')}</strong>
+              </div>
+            ` : ''}
+            ${surgeFee > 0 ? `
+              <div style="display: flex; justify-content: space-between; color: #d97706;">
+                <span>⚡ Peak Surge Surcharge:</span>
+                <strong>₹${surgeFee.toLocaleString('en-IN')}</strong>
+              </div>
+            ` : ''}
+            ${productHandlingFee > 0 ? `
+              <div style="display: flex; justify-content: space-between; color: #475569;">
+                <span>📦 Special Product Charges:</span>
+                <strong>₹${productHandlingFee.toLocaleString('en-IN')}</strong>
+              </div>
+            ` : ''}
+            ${handlingFee > 0 ? `
+              <div style="display: flex; justify-content: space-between; color: #475569;">
+                <span>Handling Fee:</span>
+                <strong>₹${handlingFee.toLocaleString('en-IN')}</strong>
+              </div>
+            ` : ''}
             ${discountAmount > 0 ? `
               <div style="display: flex; justify-content: space-between; color: #15803d;">
                 <span>Discount Applied:</span>

@@ -25,6 +25,61 @@ export interface Product {
   colours?: string[];
   color_options?: any[];
   selectedColor?: string;
+  deliveryCharge?: number;
+  handlingCharge?: number;
+}
+
+export interface FeePolicySettings {
+  freeDeliveryThreshold: number; // e.g. 499 (>= threshold => free delivery)
+  baseDeliveryFee: number; // e.g. 49 (< threshold => base fee)
+  handlingFee: number; // e.g. 9
+  rainFee: {
+    enabled: boolean;
+    amount: number; // e.g. 20
+    label?: string;
+  };
+  surgeFee: {
+    enabled: boolean;
+    amount: number; // e.g. 15
+    label?: string;
+  };
+  customFees?: Array<{
+    id: string;
+    label: string;
+    amount: number;
+    enabled: boolean;
+  }>;
+  productCharges?: Record<string, number>; // productId -> charge
+  productChargeMode?: 'per_item' | 'per_unique_product';
+  updatedAt?: string;
+  updatedBy?: string;
+}
+
+export interface ProductChargeDetail {
+  productId: string;
+  name: string;
+  unitCharge: number;
+  quantity: number;
+  totalCharge: number;
+}
+
+export interface OrderFeeBreakdown {
+  subtotal: number;
+  isFreeDelivery: boolean;
+  freeDeliveryThreshold: number;
+  deliveryFee: number;
+  baseDeliveryFee: number;
+  handlingFee: number;
+  rainFee: number;
+  rainFeeActive: boolean;
+  surgeFee: number;
+  surgeFeeActive: boolean;
+  productCharges: ProductChargeDetail[];
+  totalProductCharges: number;
+  customFees: Array<{ id: string; label: string; amount: number }>;
+  totalCustomFees: number;
+  totalFees: number;
+  grandTotal: number;
 }
 
 export interface CartItem {
@@ -163,7 +218,11 @@ export interface Order {
   subtotal?: number;
   deliveryFee: number;
   handlingFee: number;
+  rainFee?: number;
+  surgeFee?: number;
+  productHandlingFee?: number;
   fees?: number;
+  feeBreakdown?: OrderFeeBreakdown;
   discount: number;
   discountAmount?: number;
   couponCode?: string | null;
