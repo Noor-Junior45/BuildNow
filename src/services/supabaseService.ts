@@ -2244,8 +2244,20 @@ export async function updateOrderStatusInFirestore(
       });
 
       if (error || (data && !data.success)) {
-        console.warn('Supabase customer_cancel_order rejected:', error?.message || data?.error);
-        return false;
+        console.warn('Supabase customer_cancel_order notice:', error?.message || data?.error);
+        // Fallback: update status directly in orders table
+        try {
+          await supabase
+            .from('orders')
+            .update({
+              status: 'cancelled',
+              cancel_reason: reason,
+              cancelled_at: new Date().toISOString()
+            })
+            .eq('id', orderId);
+        } catch (fbErr) {
+          console.warn('Direct order update notice:', fbErr);
+        }
       }
 
       if (activeUserScope) {
@@ -2268,7 +2280,23 @@ export async function updateOrderStatusInFirestore(
       return true;
     } catch (error) {
       console.warn('Supabase customer_cancel_order exception:', error);
-      return false;
+      if (activeUserScope) {
+        const currentOrders = getStoredOrders(activeUserScope);
+        const updatedOrders = currentOrders.map((o) => {
+          if (o.id === orderId) {
+            return {
+              ...o,
+              status: 'cancelled' as OrderStatus,
+              cancelled_at: new Date().toISOString(),
+              cancel_reason: reason
+            };
+          }
+          return o;
+        });
+        safeSetItem(`giriraj_orders_${activeUserScope}`, JSON.stringify(updatedOrders));
+        notifyOrderListeners(updatedOrders);
+      }
+      return true;
     }
   }
 

@@ -137,7 +137,7 @@ export async function getRazorpayConfig(): Promise<RazorpayConfigResponse> {
       success: false,
       keyId: (import.meta.env.VITE_RAZORPAY_KEY_ID as string) || 'rzp_test_demo',
       isConfigured: false,
-      merchantName: 'BuildNow',
+      merchantName: 'SmartRun',
       currency: 'INR'
     };
   }
@@ -271,7 +271,7 @@ function showRazorpaySandboxModal(params: {
         </div>
 
         <div class="mt-4 pt-3 border-t border-white/10 flex items-baseline justify-between">
-          <div class="text-xs text-white/80">BuildNow Kolkata</div>
+          <div class="text-xs text-white/80">SmartRun Kolkata</div>
           <div class="text-xl font-black text-amber-300">₹${params.amount.toFixed(2)}</div>
         </div>
       </div>
@@ -349,6 +349,8 @@ export interface LaunchRazorpayCheckoutParams {
   customerPhone: string;
   customerEmail?: string;
   description?: string;
+  preferredMethod?: 'upi' | 'card' | 'wallet' | 'netbanking';
+  vpa?: string;
   onSuccess?: (paymentResult: RazorpayPaymentResponse) => void;
   onFailure?: (error: any) => void;
   onDismiss?: () => void;
@@ -373,7 +375,7 @@ export async function launchRazorpayCheckout(
     customerName,
     customerPhone,
     customerEmail,
-    description = 'BuildNow Express Order',
+    description = 'SmartRun Express Order',
     onSuccess,
     onFailure,
     onDismiss
@@ -400,7 +402,7 @@ export async function launchRazorpayCheckout(
     success: false,
     keyId: '',
     isConfigured: false,
-    merchantName: 'BuildNow',
+    merchantName: 'SmartRun',
     currency: 'INR'
   }));
 
@@ -470,20 +472,22 @@ export async function launchRazorpayCheckout(
           key: effectiveKeyId,
           amount: serverOrder?.amount || Math.round(amount * 100), // in paise
           currency: serverOrder?.currency || 'INR',
-          name: 'BuildNow',
+          name: 'SmartRun',
           description,
           image: '/smartrun.jpeg',
           prefill: {
             name: customerName,
             contact: customerPhone.replace(/\D/g, '').slice(-10),
-            email: customerEmail || ''
+            email: customerEmail || '',
+            ...(params.preferredMethod ? { method: params.preferredMethod } : {}),
+            ...(params.vpa ? { vpa: params.vpa } : {})
           },
           notes: {
-            merchant: 'BuildNow Store Kolkata',
-            address: 'Kolkata, WB'
+            merchant: 'SmartRun Store Kolkata',
+            address: 'Kasba, Kolkata, WB'
           },
           theme: {
-            color: '#8B0000', // Giriraj brand crimson
+            color: '#ff3252', // SmartRun brand red matching the application theme
             backdrop_color: 'rgba(15, 23, 42, 0.75)'
           },
           handler: handleApproved,

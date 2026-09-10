@@ -350,26 +350,37 @@ export const OrderHistoryView: React.FC<OrderHistoryViewProps> = ({
       await updateOrderStatusInFirestore(order.id, 'cancelled', finalReason);
 
       // 2. Decide refund using authoritative response data
-      const returnedMethod = String(data.payment_method || order.paymentMethod || '').toLowerCase();
-      const returnedStatus = String(data.payment_status || order.paymentStatus || '').toLowerCase();
+      const returnedMethod = String(data?.payment_method || order.paymentMethod || '').toLowerCase();
+      const returnedStatus = String(data?.payment_status || order.paymentStatus || '').toLowerCase();
       const isPaid = (returnedMethod !== 'cod' && returnedMethod !== '') || returnedStatus === 'paid';
       const refundAmount =
-        typeof data.total_amount === 'number' && data.total_amount > 0
+        typeof data?.total_amount === 'number' && data.total_amount > 0
           ? data.total_amount
           : (order.totalAmount ?? order.total ?? (order as any).finalAmount ?? 0);
-      const razorpayPaymentId = data.razorpay_payment_id;
+      const razorpayPaymentId =
+        data?.razorpay_payment_id ||
+        (order as any).razorpay_payment_id ||
+        order.paymentId ||
+        order.razorpayPaymentId ||
+        (order as any).payment_id ||
+        '';
+      const razorpayOrderId =
+        data?.razorpay_order_id ||
+        order.razorpayOrderId ||
+        (order as any).razorpay_order_id ||
+        '';
 
       if (isPaid && refundAmount > 0) {
-        if (razorpayPaymentId) {
+        if (razorpayPaymentId || razorpayOrderId) {
           try {
             const refundRes = await initiateRazorpayRefund(
-              razorpayPaymentId,
+              razorpayPaymentId || '',
               refundAmount,
-              order.id,
+              razorpayOrderId || order.id,
               finalReason
             );
             showToast(
-              `Order #${getOrderDisplayNumber(order)} cancelled. Full refund of ₹${refundAmount.toLocaleString('en-IN')} initiated directly via Razorpay back to your account! (Ref: ${refundRes.refundId || 'Processed'})`,
+              `Order #${getOrderDisplayNumber(order)} cancelled. 100% refund of ₹${refundAmount.toLocaleString('en-IN')} initiated directly via Razorpay back to your account! (Ref: ${refundRes.refundId || 'Processed'})`,
               'success',
               6000
             );

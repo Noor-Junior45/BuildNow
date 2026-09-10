@@ -374,22 +374,33 @@ export const LiveOrderPage: React.FC<LiveOrderPageProps> = ({
       await updateOrderStatusInFirestore(order.id, 'cancelled', finalReason);
 
       // 2. Decide refund using authoritative response data
-      const returnedMethod = String(data.payment_method || order.paymentMethod || '').toLowerCase();
-      const returnedStatus = String(data.payment_status || order.paymentStatus || '').toLowerCase();
+      const returnedMethod = String(data?.payment_method || order.paymentMethod || '').toLowerCase();
+      const returnedStatus = String(data?.payment_status || order.paymentStatus || '').toLowerCase();
       const isPaid = (returnedMethod !== 'cod' && returnedMethod !== '') || returnedStatus === 'paid';
       const refundAmount =
-        typeof data.total_amount === 'number' && data.total_amount > 0
+        typeof data?.total_amount === 'number' && data.total_amount > 0
           ? data.total_amount
           : (order.totalAmount ?? order.total ?? (order as any).finalAmount ?? 0);
-      const razorpayPaymentId = data.razorpay_payment_id;
+      const razorpayPaymentId =
+        data?.razorpay_payment_id ||
+        (order as any).razorpay_payment_id ||
+        order.paymentId ||
+        order.razorpayPaymentId ||
+        (order as any).payment_id ||
+        '';
+      const razorpayOrderId =
+        data?.razorpay_order_id ||
+        order.razorpayOrderId ||
+        (order as any).razorpay_order_id ||
+        '';
 
       if (isPaid && refundAmount > 0) {
-        if (razorpayPaymentId) {
+        if (razorpayPaymentId || razorpayOrderId) {
           try {
             const refundRes = await initiateRazorpayRefund(
-              razorpayPaymentId,
+              razorpayPaymentId || '',
               refundAmount,
-              order.id,
+              razorpayOrderId || order.id,
               finalReason
             );
             showToast(
@@ -415,11 +426,11 @@ export const LiveOrderPage: React.FC<LiveOrderPageProps> = ({
             );
           }
         } else {
-          // No valid razorpay_payment_id returned
+          // No valid payment id found
           try {
             await supabase.rpc('mark_refund_manual_processing', {
               p_order_id: order.id,
-              p_error: 'No razorpay_payment_id recorded for this order'
+              p_error: 'No payment identifier recorded for this order'
             });
           } catch (auditErr) {
             console.warn('Failed to record missing payment id flag:', auditErr);

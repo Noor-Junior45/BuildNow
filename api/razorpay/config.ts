@@ -31,7 +31,7 @@ export default async function handler(req: any, res: any) {
     success: true,
     keyId,
     isConfigured,
-    merchantName: "BuildNow",
+    merchantName: "SmartRun",
     currency: "INR"
   });
 }
