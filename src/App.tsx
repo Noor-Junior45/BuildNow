@@ -28,6 +28,7 @@ import { AddProductModal } from './components/AddProductModal';
 import { FloatingLiveOrderButton } from './components/orders/FloatingLiveOrderButton';
 import { LiveOrderDetailsModal } from './components/orders/LiveOrderDetailsModal';
 import { LiveOrderPage } from './components/orders/LiveOrderPage';
+import { AccountDeletionPage } from './components/AccountDeletionPage';
 import { SEOHead } from './components/SEOHead';
 import {
   trackPageView,
@@ -1080,7 +1081,7 @@ export default function App() {
   // 2. If user is NOT logged in, require login first before accessing store & features
   if (!isAuthenticated) {
     return (
-      <div className="min-h-screen bg-white flex flex-col text-slate-900 selection:bg-yellow-400 selection:text-black">
+      <div className="min-h-screen bg-slate-50 flex flex-col text-slate-900 selection:bg-yellow-400 selection:text-black">
         <SEOHead />
         <main className="flex-1">
           <Routes>
@@ -1099,6 +1100,10 @@ export default function App() {
             <Route path="/terms-of-service" element={<LegalView onBack={() => navigate('/login')} type="terms" />} />
             <Route path="/reset-password" element={<ResetPassword onOpenAuth={() => navigate('/login')} />} />
             
+            {/* Account & Data Deletion Portal (Google Play Policy Compliant) */}
+            <Route path="/delete" element={<AccountDeletionPage onOpenAuth={() => navigate('/login')} onBack={() => navigate('/login')} />} />
+            <Route path="/account-deletion" element={<AccountDeletionPage onOpenAuth={() => navigate('/login')} onBack={() => navigate('/login')} />} />
+
             {/* Explicit Login Route & Wildcard fallback */}
             <Route path="/login" element={<LoginPage onAuthSuccess={handleAuthSuccess} />} />
             <Route path="*" element={<LoginPage onAuthSuccess={handleAuthSuccess} />} />
@@ -1109,7 +1114,7 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen bg-white flex flex-col text-slate-900 selection:bg-yellow-400 selection:text-black">
+    <div className="min-h-screen bg-slate-50 flex flex-col text-slate-900 selection:bg-yellow-400 selection:text-black">
       {/* Dynamic SEO Meta & Structured Data Manager */}
       <SEOHead />
       
@@ -1139,7 +1144,7 @@ export default function App() {
       )}
 
       {/* Main App Content View with Routes */}
-      <main className="flex-1 pb-20 sm:pb-24">
+      <main className="flex-1">
         <Routes>
           {/* FLIPKART-STYLE ELECTRICAL LISTING PAGE */}
           <Route
@@ -1362,6 +1367,30 @@ export default function App() {
           <Route path="/privacy-policy" element={<LegalView onBack={() => navigate('/')} type="privacy" />} />
           <Route path="/terms" element={<LegalView onBack={() => navigate('/')} type="terms" />} />
           <Route path="/terms-of-service" element={<LegalView onBack={() => navigate('/')} type="terms" />} />
+
+          {/* Account & Data Deletion Portal (Google Play Policy Compliant) */}
+          <Route
+            path="/delete"
+            element={
+              <AccountDeletionPage
+                userProfile={userProfile}
+                orders={orders}
+                onOpenAuth={() => navigate('/login')}
+                onBack={() => navigate('/profile')}
+              />
+            }
+          />
+          <Route
+            path="/account-deletion"
+            element={
+              <AccountDeletionPage
+                userProfile={userProfile}
+                orders={orders}
+                onOpenAuth={() => navigate('/login')}
+                onBack={() => navigate('/profile')}
+              />
+            }
+          />
 
           {/* PASSWORD RESET */}
           <Route path="/reset-password" element={<ResetPassword onOpenAuth={() => navigate('/login')} />} />

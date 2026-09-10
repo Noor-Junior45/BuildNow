@@ -21,6 +21,9 @@ export interface Product {
   specs: { [key: string]: string };
   description: string;
   tags: string[];
+  colors?: string[];
+  colours?: string[];
+  color_options?: any[];
   selectedColor?: string;
 }
 

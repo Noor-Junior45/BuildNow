@@ -16,7 +16,12 @@ import { ElectricalProduct, FilterState, SortOption } from '../../types/electric
 import { fetchElectricalProducts } from '../../services/electricalService';
 import { Product } from '../../types';
 import { supabase } from '../../lib/supabaseClient';
-import { isWireProduct, isPipeProduct, getProductColorOptions } from '../../data/wireColors';
+import {
+  isWireProduct,
+  isPipeProduct,
+  getProductColorOptions,
+  getDefaultProductColor
+} from '../../data/wireColors';
 import { ProductCardImage } from '../ProductCardImage';
 import { hapticLight, hapticSelection } from '../../utils/haptics';
 import { getFlattenedSpecifications } from '../../utils/productSpecifications';
@@ -302,7 +307,11 @@ export const ElectricalListingPage: React.FC<ElectricalListingPageProps> = ({
       return acc;
     }, {} as Record<string, string>),
     description: ep.description,
-    tags: [ep.brand, ep.subcategory, 'Electrical']
+    tags: [ep.brand, ep.subcategory, 'Electrical'],
+    colors: ep.colors || [],
+    colours: ep.colours || ep.colors || [],
+    color_options: ep.color_options,
+    selectedColor: ep.selectedColor || ep.selected_color
   });
 
   // Paginated slices
@@ -481,21 +490,30 @@ export const ElectricalListingPage: React.FC<ElectricalListingPageProps> = ({
                         )}
                       </div>
 
-                      {/* Pipe & Wire Standard Colours Indicator */}
-                      {(isWireProduct(adapted) || isPipeProduct(adapted)) && (
+                      {/* Available Colours / Finishes Indicator */}
+                      {getProductColorOptions(adapted).length > 0 && (
                         <div className="mt-1.5 pt-1 border-t border-dashed border-slate-100 flex items-center justify-between gap-1">
                           <span className="text-[10px] font-bold text-slate-500">
-                            {isPipeProduct(adapted) ? 'Pipe Colours:' : 'IS 694 Colours:'}
+                            {isPipeProduct(adapted)
+                              ? 'Pipe Colours:'
+                              : isWireProduct(adapted)
+                              ? 'IS 694 Colours:'
+                              : 'Colours / Finishes:'}
                           </span>
-                          <div className="flex items-center gap-1">
-                            {getProductColorOptions(adapted).map(c => (
+                          <div className="flex items-center gap-1 flex-wrap justify-end">
+                            {getProductColorOptions(adapted).slice(0, 5).map((c) => (
                               <span
                                 key={c.name}
                                 title={`${c.name} (${c.shortRole || c.name})`}
-                                className="w-2.5 h-2.5 rounded-full border border-black/20"
+                                className="w-2.5 h-2.5 rounded-full border border-black/20 shadow-2xs inline-block"
                                 style={{ backgroundColor: c.hex }}
                               />
                             ))}
+                            {getProductColorOptions(adapted).length > 5 && (
+                              <span className="text-[9px] text-slate-400 font-bold">
+                                +{getProductColorOptions(adapted).length - 5}
+                              </span>
+                            )}
                           </div>
                         </div>
                       )}
@@ -529,7 +547,11 @@ export const ElectricalListingPage: React.FC<ElectricalListingPageProps> = ({
                                 if (onUpdateQuantity) {
                                   onUpdateQuantity(adapted.id, 1);
                                 } else {
-                                  onAddToCart(adapted);
+                                  const defColor = getDefaultProductColor(adapted);
+                                  onAddToCart({
+                                    ...adapted,
+                                    selectedColor: defColor || adapted.selectedColor || undefined
+                                  });
                                 }
                               }
                             }}
@@ -546,7 +568,11 @@ export const ElectricalListingPage: React.FC<ElectricalListingPageProps> = ({
                           onClick={(e) => {
                             e.preventDefault();
                             e.stopPropagation();
-                            onAddToCart(adapted);
+                            const defColor = getDefaultProductColor(adapted);
+                            onAddToCart({
+                              ...adapted,
+                              selectedColor: defColor || adapted.selectedColor || undefined
+                            });
                           }}
                           className="w-full py-2 px-3 rounded-lg bg-yellow-400 hover:bg-yellow-500 text-slate-950 font-black text-xs transition-all cursor-pointer flex items-center justify-center gap-1.5 active:scale-98 shadow-xs border border-yellow-500/20"
                         >

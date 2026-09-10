@@ -113,6 +113,18 @@ export const Footer: React.FC<FooterProps> = () => {
                   <span>Shipping &amp; Delivery Policy</span>
                 </Link>
               </li>
+
+              {/* 5. Request Account & Data Deletion (Google Play Compliance) */}
+              <li>
+                <Link
+                  to="/delete"
+                  className="text-slate-300 hover:text-red-400 transition-colors font-medium flex items-center gap-1.5 cursor-pointer"
+                  id="footer-account-deletion-link"
+                >
+                  <span className="text-red-500">›</span>
+                  <span>Request Account &amp; Data Deletion</span>
+                </Link>
+              </li>
             </ul>
           </div>
 

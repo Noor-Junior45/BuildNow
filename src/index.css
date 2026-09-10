@@ -170,8 +170,20 @@
 }
 
 /* Ensure clean map presentation with zero watermark or attribution overlay */
-.leaflet-control-attribution {
+.leaflet-control-attribution,
+.gm-err-container,
+.gm-err-content,
+.gm-style-cc,
+.gm-style a[href^="https://maps.google.com/maps"],
+.gm-style a[href^="http://maps.google.com/maps"],
+.gmnoprint a,
+.gmnoprint span {
   display: none !important;
+}
+
+/* Ensure Google Maps canvas fills smoothly with no dimming */
+.gm-style {
+  font-family: inherit !important;
 }
 
 

@@ -67,6 +67,46 @@ export function transformToElectricalProduct(item: any): ElectricalProduct {
     } catch {}
   }
 
+  // Parse color options from database row
+  let colors: string[] | undefined = undefined;
+  if (Array.isArray(item.colors) && item.colors.length > 0) {
+    colors = item.colors
+      .map((c: any) => (typeof c === 'string' ? c.trim() : c?.name || c?.label || String(c)))
+      .filter((c: string) => Boolean(c && c.length > 0));
+  } else if (Array.isArray(item.colours) && item.colours.length > 0) {
+    colors = item.colours
+      .map((c: any) => (typeof c === 'string' ? c.trim() : c?.name || c?.label || String(c)))
+      .filter((c: string) => Boolean(c && c.length > 0));
+  } else if (Array.isArray(item.color_options) && item.color_options.length > 0) {
+    colors = item.color_options
+      .map((c: any) => (typeof c === 'string' ? c.trim() : c?.name || c?.label || String(c)))
+      .filter((c: string) => Boolean(c && c.length > 0));
+  } else if (typeof item.colors === 'string' && item.colors.trim()) {
+    try {
+      const parsed = JSON.parse(item.colors);
+      if (Array.isArray(parsed)) {
+        colors = parsed.map((c: any) => (typeof c === 'string' ? c.trim() : String(c))).filter(Boolean);
+      } else {
+        colors = item.colors.split(/[,/|]+/).map((s: string) => s.trim()).filter(Boolean);
+      }
+    } catch {
+      colors = item.colors.split(/[,/|]+/).map((s: string) => s.trim()).filter(Boolean);
+    }
+  } else if (typeof item.colours === 'string' && item.colours.trim()) {
+    try {
+      const parsed = JSON.parse(item.colours);
+      if (Array.isArray(parsed)) {
+        colors = parsed.map((c: any) => (typeof c === 'string' ? c.trim() : String(c))).filter(Boolean);
+      } else {
+        colors = item.colours.split(/[,/|]+/).map((s: string) => s.trim()).filter(Boolean);
+      }
+    } catch {
+      colors = item.colours.split(/[,/|]+/).map((s: string) => s.trim()).filter(Boolean);
+    }
+  } else if (typeof item.color === 'string' && item.color.trim()) {
+    colors = [item.color.trim()];
+  }
+
   return {
     id: String(item.id),
     name: item.name || 'Electrical Product',
@@ -83,6 +123,10 @@ export function transformToElectricalProduct(item: any): ElectricalProduct {
     image_urls,
     rating_avg: Number(item.rating_avg || item.rating || 4.8),
     rating_count: Number(item.rating_count || item.reviewsCount || item.reviews_count || 32),
+    colors,
+    colours: colors,
+    selectedColor: item.selectedColor || item.selected_color,
+    selected_color: item.selected_color || item.selectedColor,
     created_at: item.created_at || new Date().toISOString()
   };
 }

@@ -90,7 +90,7 @@ export const LocationModal: React.FC<LocationModalProps> = ({
   const [isMapDragging, setIsMapDragging] = useState(false);
   const [mapSearchResults, setMapSearchResults] = useState<MapSearchResult[]>([]);
   const [isSearchingMap, setIsSearchingMap] = useState(false);
-  const [activeProvider, setActiveProvider] = useState<'mappls' | 'google' | 'osm'>('mappls');
+  const [activeProvider, setActiveProvider] = useState<'google' | 'osm'>('google');
   const [isRetryingMap, setIsRetryingMap] = useState(false);
   const [retryStatusMessage, setRetryStatusMessage] = useState<string | null>(null);
   const searchAbortRef = useRef<AbortController | null>(null);
@@ -367,7 +367,7 @@ export const LocationModal: React.FC<LocationModalProps> = ({
     }
   };
 
-  // Retry and re-initialize map if Mappls script or initialization failed
+  // Retry and re-initialize map if script or initialization failed
   const handleRetryMap = useCallback(async () => {
     if (isRetryingMap || !mapContainerRef.current) return;
     setIsRetryingMap(true);
@@ -406,11 +406,11 @@ export const LocationModal: React.FC<LocationModalProps> = ({
       setTimeout(() => instance.invalidateSize(), 200);
       resolveCoordinatesToAddress(lat, lng);
 
-      if (provider === 'mappls') {
-        showToast('Mappls Map connected successfully', 'success');
+      if (provider === 'google') {
+        showToast('Google Maps connected successfully', 'success');
         setRetryStatusMessage(null);
       } else {
-        setRetryStatusMessage(`Loaded backup map (${provider.toUpperCase()})`);
+        setRetryStatusMessage('Loaded backup map (OSM)');
         setTimeout(() => setRetryStatusMessage(null), 4000);
       }
     } catch (err: any) {

@@ -241,6 +241,9 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
     }, {} as Record<string, string>),
     description: ep.description,
     tags: [ep.brand, ep.subcategory, isPipe ? 'Pipes' : 'Electrical'],
+    colors: ep.colors || [],
+    colours: ep.colours || ep.colors || [],
+    color_options: ep.color_options,
     selectedColor: hasColorOptions ? selectedWireColor : undefined
   });
 

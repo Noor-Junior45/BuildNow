@@ -1,7 +1,6 @@
 import React from 'react';
-import { ArrowLeft, Bell } from 'lucide-react';
+import { ArrowLeft } from 'lucide-react';
 import { requestPushNotificationPermission } from '../../services/pushNotificationService';
-import { RefundPolicy } from '../RefundPolicy';
 
 interface NotificationsSubPageProps {
   mobileAlerts: boolean;
@@ -173,11 +172,6 @@ export const NotificationsSubPage: React.FC<NotificationsSubPageProps> = ({
               />
             </button>
           </div>
-        </div>
-
-        {/* Razorpay Refund & Cancellation Transparency Policy */}
-        <div className="pt-2">
-          <RefundPolicy isEmbedded={true} onContactSupport={onContactSupport} />
         </div>
       </div>
     </div>

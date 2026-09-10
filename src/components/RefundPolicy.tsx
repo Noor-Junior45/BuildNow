@@ -49,11 +49,6 @@ export const RefundPolicy: React.FC<RefundPolicyProps> = ({
             ) : (
               <div />
             )}
-            <div className="text-right">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-amber-300 bg-black/25 px-2.5 py-1 rounded-full border border-amber-300/30">
-                Razorpay Direct Clearing
-              </span>
-            </div>
           </div>
 
           <div className="max-w-3xl mx-auto mt-4">
@@ -65,9 +60,6 @@ export const RefundPolicy: React.FC<RefundPolicyProps> = ({
                 <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-white">
                   Refund Policy
                 </h1>
-                <p className="text-xs sm:text-sm text-white/90 font-medium mt-0.5">
-                  100% Processed Directly by Razorpay to Your Source Account
-                </p>
               </div>
             </div>
           </div>
@@ -83,17 +75,9 @@ export const RefundPolicy: React.FC<RefundPolicyProps> = ({
                 <ShieldCheck className="w-5 h-5 text-amber-300" />
               </div>
               <div>
-                <div className="flex items-center gap-2">
-                  <h2 className="text-base sm:text-lg font-bold text-slate-900">
-                    Payment Refund Policy
-                  </h2>
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-full border border-emerald-200">
-                    Razorpay Direct
-                  </span>
-                </div>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  Full transparency on cancelled order refunds &amp; bank clearing
-                </p>
+                <h2 className="text-base sm:text-lg font-bold text-slate-900">
+                  Refund Policy
+                </h2>
               </div>
             </div>
           </div>

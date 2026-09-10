@@ -16,8 +16,10 @@ import {
   FileText,
   Lock,
   Heart,
-  RotateCcw
+  RotateCcw,
+  Trash2
 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { Order, SavedAddress, UserProfile, CartItem, Product, WalletTransaction } from '../types';
 import { OrderHistoryView } from './OrderHistoryView';
 import {
@@ -78,6 +80,8 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
   onAddToCart,
   allProducts
 }) => {
+  const navigate = useNavigate();
+
   // Current active sub-page view: 'main' | 'orders' | 'addresses' | 'payments' | 'wallet' | 'services' | 'membership' | 'help' | 'notifications' | 'privacy' | 'terms' | 'favorites' | 'refund-policy'
   const [subPage, setSubPage] = useState<
     'main' | 'orders' | 'addresses' | 'payments' | 'wallet' | 'services' | 'membership' | 'help' | 'notifications' | 'privacy' | 'terms' | 'favorites' | 'refund-policy'
@@ -241,7 +245,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
   // -------------------------------------------------------------
   if (subPage === 'orders') {
     return (
-      <div className="min-h-screen bg-slate-50 text-slate-900 pb-20">
+      <div className="min-h-screen bg-slate-50 text-slate-900 pb-10">
         <OrderHistoryView
           orders={sortedOrders}
           userProfile={userProfile}
@@ -399,7 +403,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
   // PRIMARY VIEW: SWIGGY-STYLE PROFILE DASHBOARD
   // -------------------------------------------------------------
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 pb-24">
+    <div className="min-h-screen bg-slate-50 text-slate-900 pb-10">
       {/* 1. TOP HEADER BANNER (Full width touching top & both sides, bottom curves only) */}
       <div className="bg-gradient-to-b from-[#8B0000] via-[#A30000] to-[#B31B1B] text-white pt-3.5 pb-5 px-4 sm:px-6 relative shadow-md rounded-b-2xl border-b border-red-950/30">
         {/* Top Control Bar with Back Arrow & Actions */}
@@ -694,7 +698,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
             <ChevronRight className="w-5 h-5 text-slate-400 group-hover:text-slate-600 transition-colors" />
           </button>
 
-          {/* 10. Refund Policy (Managed by Razorpay) */}
+          {/* 10. Refund Policy */}
           <button
             id="btn-profile-refund-policy"
             onClick={() => setSubPage('refund-policy')}
@@ -705,16 +709,27 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                 <RotateCcw className="w-5 h-5" />
               </div>
               <div>
-                <div className="flex items-center gap-2">
-                  <p className="text-base sm:text-lg font-normal text-slate-800">Refund Policy</p>
-                  <span className="text-[10px] font-bold text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-full border border-emerald-200">
-                    Razorpay
-                  </span>
-                </div>
-                <p className="text-xs text-slate-500 font-normal">Direct-to-source instant &amp; bank clearing</p>
+                <p className="text-base sm:text-lg font-normal text-slate-800">Refund Policy</p>
               </div>
             </div>
             <ChevronRight className="w-5 h-5 text-slate-400 group-hover:text-slate-600 transition-colors" />
+          </button>
+
+          {/* 11. Account Delete (Google Play Store Policy Compliant) */}
+          <button
+            id="btn-profile-delete-account"
+            onClick={() => navigate('/delete')}
+            className="w-full p-4 sm:p-4.5 flex items-center justify-between hover:bg-red-50/60 transition-colors text-left cursor-pointer group"
+          >
+            <div className="flex items-center gap-3.5 sm:gap-4">
+              <div className="w-10 h-10 rounded-2xl bg-red-100 border border-red-200 text-red-600 flex items-center justify-center shrink-0 shadow-2xs group-hover:scale-105 transition-transform">
+                <Trash2 className="w-5 h-5" />
+              </div>
+              <div>
+                <p className="text-base sm:text-lg font-normal text-slate-800 group-hover:text-red-700 transition-colors">Account Delete</p>
+              </div>
+            </div>
+            <ChevronRight className="w-5 h-5 text-slate-400 group-hover:text-red-600 transition-colors" />
           </button>
         </div>
 

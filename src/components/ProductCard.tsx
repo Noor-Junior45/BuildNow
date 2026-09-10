@@ -2,7 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { Plus, Minus, Star, Eye, Heart, Check, ShoppingCart } from 'lucide-react';
 import { Product } from '../types';
 import { isProductFavorite, toggleProductFavorite } from '../services/favorites';
-import { INDIAN_STANDARD_WIRE_COLORS, isWireProduct } from '../data/wireColors';
+import {
+  getProductColorOptions,
+  getDefaultProductColor,
+  isWireProduct,
+  isPipeProduct
+} from '../data/wireColors';
 import { hapticLight, hapticMedium } from '../utils/haptics';
 
 interface ProductCardProps {
@@ -23,9 +28,17 @@ export const ProductCard: React.FC<ProductCardProps> = ({
   const [isHovered, setIsHovered] = useState(false);
   const [isFav, setIsFav] = useState(() => isProductFavorite(product.id));
   const isWire = isWireProduct(product);
-  const [selectedWireColor, setSelectedWireColor] = useState<string>(
-    product.selectedColor || (isWire ? 'Red' : '')
+  const isPipe = isPipeProduct(product);
+  const colorOptions = getProductColorOptions(product);
+  const hasColorOptions = colorOptions.length > 0;
+  const [selectedColor, setSelectedColor] = useState<string>(
+    () => product.selectedColor || getDefaultProductColor(product)
   );
+
+  useEffect(() => {
+    const def = product.selectedColor || getDefaultProductColor(product);
+    if (def) setSelectedColor(def);
+  }, [product]);
 
   useEffect(() => {
     const handleFavChange = () => {
@@ -50,7 +63,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
     hapticMedium();
     onAddToCart({
       ...product,
-      selectedColor: isWire ? selectedWireColor : undefined
+      selectedColor: hasColorOptions ? selectedColor : undefined
     });
   };
 
@@ -92,7 +105,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
 
       {/* Image Container with Quick View overlay */}
       <div
-        onClick={() => onOpenQuickView({ ...product, selectedColor: isWire ? selectedWireColor : undefined })}
+        onClick={() => onOpenQuickView({ ...product, selectedColor: hasColorOptions ? selectedColor : undefined })}
         className="relative w-full aspect-square bg-slate-50 rounded-xl overflow-hidden mb-3 cursor-pointer flex items-center justify-center"
       >
         <img
@@ -137,7 +150,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
 
           {/* Product Title */}
           <h4
-            onClick={() => onOpenQuickView({ ...product, selectedColor: isWire ? selectedWireColor : undefined })}
+            onClick={() => onOpenQuickView({ ...product, selectedColor: hasColorOptions ? selectedColor : undefined })}
             className="text-xs sm:text-sm font-bold text-slate-900 line-clamp-2 leading-snug hover:text-green-700 transition-colors cursor-pointer mb-1"
             title={product.name}
           >
@@ -149,27 +162,29 @@ export const ProductCard: React.FC<ProductCardProps> = ({
             Unit: <span className="text-slate-800">{product.unit}</span>
           </div>
 
-          {/* IS 694 Indian Standard Wire Color Options */}
-          {isWire && (
+          {/* Colour / Finish Options Swatches */}
+          {hasColorOptions && (
             <div className="mb-2.5 pt-1 border-t border-dashed border-slate-100">
               <div className="flex items-center justify-between text-[10px] font-bold text-slate-600 mb-1.5">
-                <span>Wire Colour (IS 694):</span>
-                <span className="font-extrabold text-slate-900 bg-slate-100 px-1.5 py-0.2 rounded">
-                  {selectedWireColor}
+                <span>
+                  {isWire ? 'Wire Colour (IS 694):' : isPipe ? 'Pipe Colour:' : 'Colour / Finish:'}
+                </span>
+                <span className="font-extrabold text-slate-900 bg-slate-100 px-1.5 py-0.2 rounded truncate max-w-[120px]">
+                  {selectedColor || colorOptions[0]?.name}
                 </span>
               </div>
               <div className="flex items-center gap-1.5 flex-wrap">
-                {INDIAN_STANDARD_WIRE_COLORS.map((opt) => {
-                  const isSelected = selectedWireColor === opt.name;
+                {colorOptions.map((opt) => {
+                  const isSelected = (selectedColor || colorOptions[0]?.name) === opt.name;
                   return (
                     <button
                       key={opt.name}
                       type="button"
                       onClick={(e) => {
                         e.stopPropagation();
-                        setSelectedWireColor(opt.name);
+                        setSelectedColor(opt.name);
                       }}
-                      title={`${opt.label} - ${opt.shortRole}`}
+                      title={`${opt.label || opt.name} - ${opt.shortRole || opt.name}`}
                       className={`w-5 h-5 rounded-full flex items-center justify-center transition-all cursor-pointer border ${
                         isSelected
                           ? 'ring-2 ring-offset-1 ring-slate-900 scale-110 shadow-xs border-white'
@@ -180,7 +195,11 @@ export const ProductCard: React.FC<ProductCardProps> = ({
                       {isSelected && (
                         <Check
                           className={`w-3 h-3 stroke-[3] ${
-                            opt.name === 'White' ? 'text-slate-900' : 'text-white'
+                            opt.name === 'White' ||
+                            opt.name === 'Ivory / Off-White' ||
+                            opt.hex.toLowerCase() === '#ffffff'
+                              ? 'text-slate-900'
+                              : 'text-white'
                           }`}
                         />
                       )}

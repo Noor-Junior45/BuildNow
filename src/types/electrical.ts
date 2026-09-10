@@ -14,6 +14,11 @@ export interface ElectricalProduct {
   rating_avg: number;
   rating_count: number;
   faqs?: Array<{ question?: string; answer?: string; q?: string; a?: string }>;
+  colors?: string[];
+  colours?: string[];
+  color_options?: any[];
+  selectedColor?: string;
+  selected_color?: string;
   created_at?: string;
   updated_at?: string;
 }
