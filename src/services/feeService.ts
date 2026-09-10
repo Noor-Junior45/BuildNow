@@ -2,17 +2,17 @@ import { API_BASE_URL } from '../lib/apiBase';
 import { CartItem, FeePolicySettings, OrderFeeBreakdown, ProductChargeDetail } from '../types';
 
 export const DEFAULT_FEE_SETTINGS: FeePolicySettings = {
-  freeDeliveryThreshold: 499,
-  baseDeliveryFee: 49,
-  handlingFee: 9,
+  freeDeliveryThreshold: 0,
+  baseDeliveryFee: 0,
+  handlingFee: 0,
   rainFee: {
     enabled: false,
-    amount: 20,
+    amount: 0,
     label: 'Rain / Weather Surcharge'
   },
   surgeFee: {
     enabled: false,
-    amount: 15,
+    amount: 0,
     label: 'High Demand Surge'
   },
   customFees: [],
@@ -84,13 +84,13 @@ export function calculateOrderFees(
     return sum + p * it.quantity;
   }, 0);
 
-  const threshold = Number(settings.freeDeliveryThreshold ?? 499);
-  const baseFee = Number(settings.baseDeliveryFee ?? 49);
-  const isFreeDelivery = subtotal >= threshold || activeItems.length === 0;
+  const threshold = Number(settings.freeDeliveryThreshold ?? 0);
+  const baseFee = Number(settings.baseDeliveryFee ?? 0);
+  const isFreeDelivery = baseFee === 0 || subtotal >= threshold || activeItems.length === 0;
   const deliveryFee = isFreeDelivery ? 0 : baseFee;
 
   // Handling fee
-  const handlingFee = activeItems.length > 0 ? Number(settings.handlingFee ?? 9) : 0;
+  const handlingFee = activeItems.length > 0 ? Number(settings.handlingFee ?? 0) : 0;
 
   // Rain Fee
   const rainActive = Boolean(settings.rainFee?.enabled && activeItems.length > 0);

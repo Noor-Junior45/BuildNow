@@ -1,20 +1,20 @@
 {
-  "freeDeliveryThreshold": 499,
-  "baseDeliveryFee": 49,
-  "handlingFee": 9,
+  "freeDeliveryThreshold": 0,
+  "baseDeliveryFee": 0,
+  "handlingFee": 0,
   "rainFee": {
     "enabled": false,
-    "amount": 20,
+    "amount": 0,
     "label": "Rain / Weather Surcharge"
   },
   "surgeFee": {
     "enabled": false,
-    "amount": 15,
+    "amount": 0,
     "label": "Peak Demand Surge"
   },
   "customFees": [],
   "productCharges": {},
   "productChargeMode": "per_item",
-  "updatedAt": "2026-09-10T19:54:41.035Z",
-  "updatedBy": "backend_app"
+  "updatedAt": "2026-09-10T20:18:00.000Z",
+  "updatedBy": "admin_reset_zero"
 }

@@ -1880,17 +1880,17 @@ async function startServer() {
   const FEE_SETTINGS_FILE = path.join(process.cwd(), "data", "fee-settings.json");
 
   const DEFAULT_FEE_POLICY: ServerFeePolicy = {
-    freeDeliveryThreshold: 499,
-    baseDeliveryFee: 49,
-    handlingFee: 9,
+    freeDeliveryThreshold: 0,
+    baseDeliveryFee: 0,
+    handlingFee: 0,
     rainFee: {
       enabled: false,
-      amount: 20,
+      amount: 0,
       label: "Rain / Weather Surcharge"
     },
     surgeFee: {
       enabled: false,
-      amount: 15,
+      amount: 0,
       label: "Peak Demand Surge"
     },
     customFees: [],
@@ -1978,11 +1978,11 @@ async function startServer() {
 
     const subtotal = typeof claimedSubtotal === "number" && claimedSubtotal > 0 ? claimedSubtotal : computedSubtotal;
 
-    const threshold = Number(policy.freeDeliveryThreshold ?? 499);
-    const baseDeliveryFee = Number(policy.baseDeliveryFee ?? 49);
-    const isFreeDelivery = subtotal >= threshold || activeItems.length === 0;
+    const threshold = Number(policy.freeDeliveryThreshold ?? 0);
+    const baseDeliveryFee = Number(policy.baseDeliveryFee ?? 0);
+    const isFreeDelivery = baseDeliveryFee === 0 || subtotal >= threshold || activeItems.length === 0;
     const deliveryFee = isFreeDelivery ? 0 : baseDeliveryFee;
-    const handlingFee = activeItems.length > 0 ? Number(policy.handlingFee ?? 9) : 0;
+    const handlingFee = activeItems.length > 0 ? Number(policy.handlingFee ?? 0) : 0;
     const rainFee = (policy.rainFee?.enabled && activeItems.length > 0) ? Math.max(0, Number(policy.rainFee?.amount || 0)) : 0;
     const surgeFee = (policy.surgeFee?.enabled && activeItems.length > 0) ? Math.max(0, Number(policy.surgeFee?.amount || 0)) : 0;
 

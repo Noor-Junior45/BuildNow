@@ -1241,7 +1241,13 @@ export const CartView: React.FC<CartViewProps> = ({
                 ))}
                 <div className="flex justify-between">
                   <span>Handling Charges:</span>
-                  <span className="font-semibold text-slate-800">₹{handlingFee}</span>
+                  <span className="font-semibold text-slate-800">
+                    {handlingFee === 0 ? (
+                      <span className="text-emerald-700 font-bold uppercase">FREE</span>
+                    ) : (
+                      `₹${handlingFee}`
+                    )}
+                  </span>
                 </div>
                 <div className="flex justify-between text-slate-400">
                   <span>Taxes &amp; GST:</span>
