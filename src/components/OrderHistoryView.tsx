@@ -376,10 +376,10 @@ export const OrderHistoryView: React.FC<OrderHistoryViewProps> = ({
           } catch (refundErr: any) {
             console.warn('Razorpay direct refund dispatch error:', refundErr);
             try {
-              await supabase.from('orders').update({
-                refund_status: 'manual_processing_required',
-                refund_error: refundErr?.message || 'Automatic refund failed'
-              }).eq('id', order.id);
+              await supabase.rpc('mark_refund_manual_processing', {
+                p_order_id: order.id,
+                p_error: refundErr?.message || 'Automatic refund failed'
+              });
             } catch (flagErr) {
               console.warn('Failed to record refund failure flag:', flagErr);
             }
@@ -391,10 +391,10 @@ export const OrderHistoryView: React.FC<OrderHistoryViewProps> = ({
           }
         } else {
           try {
-            await supabase.from('orders').update({
-              refund_status: 'manual_processing_required',
-              refund_error: 'No razorpay_payment_id recorded for this order'
-            }).eq('id', order.id);
+            await supabase.rpc('mark_refund_manual_processing', {
+              p_order_id: order.id,
+              p_error: 'No razorpay_payment_id recorded for this order'
+            });
           } catch (flagErr) {
             console.warn('Failed to record missing payment id flag:', flagErr);
           }

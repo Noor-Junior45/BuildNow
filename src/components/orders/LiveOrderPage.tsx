@@ -401,10 +401,10 @@ export const LiveOrderPage: React.FC<LiveOrderPageProps> = ({
             console.warn('Razorpay refund error:', err);
             // Flag this state on order for support follow-up
             try {
-              await supabase.from('orders').update({
-                refund_status: 'manual_processing_required',
-                refund_error: err?.message || 'Automatic refund failed'
-              }).eq('id', order.id);
+              await supabase.rpc('mark_refund_manual_processing', {
+                p_order_id: order.id,
+                p_error: err?.message || 'Automatic refund failed'
+              });
             } catch (auditErr) {
               console.warn('Failed to record refund failure flag:', auditErr);
             }
@@ -417,10 +417,10 @@ export const LiveOrderPage: React.FC<LiveOrderPageProps> = ({
         } else {
           // No valid razorpay_payment_id returned
           try {
-            await supabase.from('orders').update({
-              refund_status: 'manual_processing_required',
-              refund_error: 'No razorpay_payment_id recorded for this order'
-            }).eq('id', order.id);
+            await supabase.rpc('mark_refund_manual_processing', {
+              p_order_id: order.id,
+              p_error: 'No razorpay_payment_id recorded for this order'
+            });
           } catch (auditErr) {
             console.warn('Failed to record missing payment id flag:', auditErr);
           }
