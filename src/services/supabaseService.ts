@@ -2058,6 +2058,10 @@ export async function createFirestoreOrder(order: Order): Promise<Order> {
     coupon_code: order.couponCode || null,
     payment_method: (order.paymentMethod || 'COD').toUpperCase(),
     payment_status: order.paymentStatus || 'pending',
+    payment_id: order.paymentId || (order as any).razorpay_payment_id || order.razorpayPaymentId || null,
+    razorpay_payment_id: (order as any).razorpay_payment_id || order.razorpayPaymentId || order.paymentId || null,
+    razorpay_order_id: (order as any).razorpay_order_id || order.razorpayOrderId || null,
+    razorpay_signature: (order as any).razorpay_signature || order.razorpaySignature || null,
     status: order.status || 'pending',
     tracking_number: order.trackingNumber || humanReadableNumber,
     placed_at: order.createdAt || new Date().toISOString(),
@@ -2175,10 +2179,99 @@ export async function createFirestoreOrder(order: Order): Promise<Order> {
   return order;
 }
 
+export interface CustomerCancelOrderResponse {
+  success: boolean;
+  error?: string;
+  payment_method?: string;
+  payment_status?: string;
+  razorpay_payment_id?: string;
+  total_amount?: number;
+}
+
 /**
- * Updates order status in Supabase
+ * Executes authoritative customer order cancellation through secure database RPC
  */
-export async function updateOrderStatusInFirestore(orderId: string, newStatus: OrderStatus): Promise<boolean> {
+export async function customerCancelOrderRpc(
+  orderId: string,
+  reason: string = 'Customer requested cancellation'
+): Promise<{ data: CustomerCancelOrderResponse | null; error: any }> {
+  try {
+    const { data, error } = await supabase.rpc('customer_cancel_order', {
+      p_order_id: orderId,
+      p_reason: reason
+    });
+
+    if (!error && data && data.success) {
+      if (activeUserScope) {
+        const currentOrders = getStoredOrders(activeUserScope);
+        const updatedOrders = currentOrders.map((o) => {
+          if (o.id === orderId) {
+            return {
+              ...o,
+              status: 'cancelled' as OrderStatus,
+              cancelled_at: new Date().toISOString(),
+              cancel_reason: reason
+            };
+          }
+          return o;
+        });
+        safeSetItem(`giriraj_orders_${activeUserScope}`, JSON.stringify(updatedOrders));
+        notifyOrderListeners(updatedOrders);
+      }
+    }
+
+    return { data: data as CustomerCancelOrderResponse | null, error };
+  } catch (err: any) {
+    return { data: null, error: err };
+  }
+}
+
+/**
+ * Updates order status in Supabase.
+ * NOTE: When cancelling, STOP calling supabase.from('orders').update({status:'cancelled'})
+ * directly; instead calls customer_cancel_order RPC.
+ */
+export async function updateOrderStatusInFirestore(
+  orderId: string,
+  newStatus: OrderStatus,
+  reason: string = 'Customer requested cancellation'
+): Promise<boolean> {
+  if (newStatus === 'cancelled') {
+    try {
+      const { data, error } = await supabase.rpc('customer_cancel_order', {
+        p_order_id: orderId,
+        p_reason: reason
+      });
+
+      if (error || (data && !data.success)) {
+        console.warn('Supabase customer_cancel_order rejected:', error?.message || data?.error);
+        return false;
+      }
+
+      if (activeUserScope) {
+        const currentOrders = getStoredOrders(activeUserScope);
+        const updatedOrders = currentOrders.map((o) => {
+          if (o.id === orderId) {
+            return {
+              ...o,
+              status: 'cancelled' as OrderStatus,
+              cancelled_at: new Date().toISOString(),
+              cancel_reason: reason
+            };
+          }
+          return o;
+        });
+
+        safeSetItem(`giriraj_orders_${activeUserScope}`, JSON.stringify(updatedOrders));
+        notifyOrderListeners(updatedOrders);
+      }
+      return true;
+    } catch (error) {
+      console.warn('Supabase customer_cancel_order exception:', error);
+      return false;
+    }
+  }
+
   if (activeUserScope) {
     const currentOrders = getStoredOrders(activeUserScope);
     const updatedOrders = currentOrders.map((o) => {

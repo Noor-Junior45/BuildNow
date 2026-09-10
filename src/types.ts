@@ -235,6 +235,11 @@ export interface Order {
   razorpayPaymentId?: string;
   razorpayOrderId?: string;
   razorpaySignature?: string;
+  razorpay_payment_id?: string;
+  razorpay_order_id?: string;
+  razorpay_signature?: string;
+  refund_status?: string;
+  refund_error?: string;
   status: OrderStatus;
   createdAt: string;
   placed_at?: string;

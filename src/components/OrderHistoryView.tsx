@@ -29,6 +29,7 @@ import {
 import { Order, UserProfile } from '../types';
 import { getOrderWhatsAppUrl } from '../services/emailService';
 import { deleteFirestoreOrder, clearAllUserOrders, updateOrderStatusInFirestore, saveUserProfile } from '../services/supabaseService';
+import { supabase } from '../lib/supabaseClient';
 import { initiateRazorpayRefund } from '../services/razorpayService';
 import { OrderTrackingTimeline } from './OrderTrackingTimeline';
 import { downloadInvoicePDF } from '../utils/invoiceGenerator';
@@ -321,36 +322,86 @@ export const OrderHistoryView: React.FC<OrderHistoryViewProps> = ({
         return;
       }
 
-      const success = await updateOrderStatusInFirestore(order.id, 'cancelled');
-      if (!success) {
-        throw new Error('Failed to update order status');
+      const finalReason =
+        cancelReason === 'Other reason' && otherCancelReason.trim()
+          ? otherCancelReason.trim()
+          : cancelReason || 'Customer requested 2-minute cancellation';
+
+      // 1. Authoritative cancellation via secure database function
+      const { data, error } = await supabase.rpc('customer_cancel_order', {
+        p_order_id: order.id,
+        p_reason: finalReason
+      });
+
+      if (error) {
+        showToast(error.message || 'Failed to cancel order. Please try again.', 'error');
+        setOrderToCancel(null);
+        return;
       }
 
-      // Check if online paid order to process refund directly via Razorpay
-      const isPaid = order.paymentMethod !== 'cod' || order.paymentStatus === 'paid';
-      const refundAmount = order.totalAmount ?? order.total ?? (order as any).finalAmount ?? 0;
+      if (!data || data.success === false) {
+        const failureReason = data?.error || 'This order can no longer be cancelled as per policy.';
+        showToast(failureReason, 'error', 6000);
+        setOrderToCancel(null);
+        return;
+      }
+
+      // Sync local status store
+      await updateOrderStatusInFirestore(order.id, 'cancelled', finalReason);
+
+      // 2. Decide refund using authoritative response data
+      const returnedMethod = String(data.payment_method || order.paymentMethod || '').toLowerCase();
+      const returnedStatus = String(data.payment_status || order.paymentStatus || '').toLowerCase();
+      const isPaid = (returnedMethod !== 'cod' && returnedMethod !== '') || returnedStatus === 'paid';
+      const refundAmount =
+        typeof data.total_amount === 'number' && data.total_amount > 0
+          ? data.total_amount
+          : (order.totalAmount ?? order.total ?? (order as any).finalAmount ?? 0);
+      const razorpayPaymentId = data.razorpay_payment_id;
 
       if (isPaid && refundAmount > 0) {
-        try {
-          const paymentId = (order as any).paymentId || (order as any).razorpay_payment_id || order.id;
-          const finalReason = cancelReason === 'Other reason' && otherCancelReason.trim() ? otherCancelReason.trim() : cancelReason;
-          const refundRes = await initiateRazorpayRefund(
-            paymentId,
-            refundAmount,
-            order.id,
-            finalReason || 'Cancelled within 2-minute window'
-          );
+        if (razorpayPaymentId) {
+          try {
+            const refundRes = await initiateRazorpayRefund(
+              razorpayPaymentId,
+              refundAmount,
+              order.id,
+              finalReason
+            );
+            showToast(
+              `Order #${getOrderDisplayNumber(order)} cancelled. Full refund of ₹${refundAmount.toLocaleString('en-IN')} initiated directly via Razorpay back to your account! (Ref: ${refundRes.refundId || 'Processed'})`,
+              'success',
+              6000
+            );
+          } catch (refundErr: any) {
+            console.warn('Razorpay direct refund dispatch error:', refundErr);
+            try {
+              await supabase.from('orders').update({
+                refund_status: 'manual_processing_required',
+                refund_error: refundErr?.message || 'Automatic refund failed'
+              }).eq('id', order.id);
+            } catch (flagErr) {
+              console.warn('Failed to record refund failure flag:', flagErr);
+            }
+            showToast(
+              'Order cancelled, but the refund could not be processed automatically -- our team will process it manually within 24 hours',
+              'error',
+              7000
+            );
+          }
+        } else {
+          try {
+            await supabase.from('orders').update({
+              refund_status: 'manual_processing_required',
+              refund_error: 'No razorpay_payment_id recorded for this order'
+            }).eq('id', order.id);
+          } catch (flagErr) {
+            console.warn('Failed to record missing payment id flag:', flagErr);
+          }
           showToast(
-            `Order #${getOrderDisplayNumber(order)} cancelled. Full refund of ₹${refundAmount.toLocaleString('en-IN')} initiated directly via Razorpay back to your account! (Ref: ${refundRes.refundId || 'Processed'})`,
-            'success',
-            6000
-          );
-        } catch (refundErr) {
-          console.warn('Razorpay direct refund dispatch notice:', refundErr);
-          showToast(
-            `Order #${getOrderDisplayNumber(order)} cancelled. ₹${refundAmount.toLocaleString('en-IN')} refund initiated directly via Razorpay back to your source account.`,
-            'success',
-            6000
+            'Order cancelled, but the refund could not be processed automatically -- our team will process it manually within 24 hours',
+            'error',
+            7000
           );
         }
       } else {
@@ -361,9 +412,9 @@ export const OrderHistoryView: React.FC<OrderHistoryViewProps> = ({
       if (onRefresh) {
         await onRefresh();
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to cancel order:', err);
-      showToast('Could not cancel order. Please check your internet connection.', 'error');
+      showToast(err?.message || 'Could not cancel order. Please check your internet connection.', 'error');
     } finally {
       setCancellingOrderId(null);
     }

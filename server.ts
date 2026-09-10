@@ -1213,6 +1213,13 @@ const OrderCheckoutSchema = z.object({
   totalAmount: z.number().nonnegative("Total amount must be positive"),
   paymentMethod: z.enum(["cod", "upi", "card"]).default("cod"),
   paymentStatus: z.enum(["paid", "pending"]).default("pending"),
+  paymentId: z.string().optional().nullable(),
+  razorpayPaymentId: z.string().optional().nullable(),
+  razorpayOrderId: z.string().optional().nullable(),
+  razorpaySignature: z.string().optional().nullable(),
+  razorpay_payment_id: z.string().optional().nullable(),
+  razorpay_order_id: z.string().optional().nullable(),
+  razorpay_signature: z.string().optional().nullable(),
   status: z.enum(["pending", "accepted", "packing", "out_for_delivery", "delivered", "cancelled"]).default("pending"),
   createdAt: z.string().optional(),
   estimatedDeliveryTimestamp: z.number().optional(),
@@ -2255,6 +2262,10 @@ async function startServer() {
               total_amount: validatedOrder.totalAmount,
               payment_method: validatedOrder.paymentMethod,
               payment_status: validatedOrder.paymentStatus,
+              payment_id: validatedOrder.paymentId || (validatedOrder as any).razorpay_payment_id || validatedOrder.razorpayPaymentId || null,
+              razorpay_payment_id: (validatedOrder as any).razorpay_payment_id || validatedOrder.razorpayPaymentId || validatedOrder.paymentId || null,
+              razorpay_order_id: (validatedOrder as any).razorpay_order_id || validatedOrder.razorpayOrderId || null,
+              razorpay_signature: (validatedOrder as any).razorpay_signature || validatedOrder.razorpaySignature || null,
               status: validatedOrder.status,
               created_at: validatedOrder.createdAt || new Date().toISOString(),
               placed_at: validatedOrder.createdAt || new Date().toISOString(),
@@ -2504,9 +2515,7 @@ async function startServer() {
   // =========================================================================
   // RAZORPAY PAYMENT GATEWAY & REFUND ENDPOINTS
   // =========================================================================
-  // Official Test Credentials provided for Giriraj Power
   const DEFAULT_RAZORPAY_KEY_ID = "rzp_test_TZw5E2BUHZrnOU";
-  const DEFAULT_RAZORPAY_KEY_SECRET = "0QBDv7zGcD6I9Mj0zJ0Vad1X";
 
   function isValidRazorpayKeyId(keyId: string): boolean {
     if (!keyId) return false;
@@ -2528,12 +2537,12 @@ async function startServer() {
     return DEFAULT_RAZORPAY_KEY_ID;
   }
 
-  function resolveRazorpayKeySecret(): string {
+  function resolveRazorpayKeySecret(): string | null {
     const envSecret = (process.env.RAZORPAY_KEY_SECRET || "").trim();
     if (envSecret && envSecret.length >= 8) {
       return envSecret;
     }
-    return DEFAULT_RAZORPAY_KEY_SECRET;
+    return null;
   }
 
   let razorpayClientInstance: any = null;
@@ -2739,57 +2748,17 @@ async function startServer() {
       if (!paymentId) {
         return res.status(400).json({
           success: false,
+          error: "Payment ID is required to process a refund.",
           message: "Payment ID is required to process a refund."
         });
       }
 
-      const razorpay = getRazorpayClient();
+      const isTestPayment = String(paymentId).startsWith("pay_test_");
       const parsedAmount = amount ? Number(amount) : undefined;
       const amountInPaise = parsedAmount && parsedAmount > 0 ? Math.round(parsedAmount * 100) : undefined;
 
-      const isTestPayment = String(paymentId).startsWith("pay_test_");
-
-      if (razorpay && !isTestPayment) {
-        try {
-          const refundPayload: any = {
-            speed: "optimum",
-            notes: {
-              orderId: orderId || "N/A",
-              reason: reason || "Order cancelled by customer within 2-minute window"
-            }
-          };
-          if (amountInPaise) {
-            refundPayload.amount = amountInPaise;
-          }
-
-          const refundResult = await razorpay.payments.refund(paymentId, refundPayload);
-
-          return res.status(200).json({
-            success: true,
-            refundId: refundResult.id,
-            status: refundResult.status || "processed",
-            amount: refundResult.amount ? refundResult.amount / 100 : parsedAmount,
-            currency: refundResult.currency || "INR",
-            speedProcessed: refundResult.speed_processed || "optimum",
-            paymentId,
-            message: "Refund initiated successfully by Razorpay directly back to user's account."
-          });
-        } catch (apiErr: any) {
-          console.warn("[Razorpay Refund API Notice - falling back to simulated refund]:", apiErr?.error || apiErr?.message || apiErr);
-          const mockRefundId = `rfnd_test_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
-          return res.status(200).json({
-            success: true,
-            refundId: mockRefundId,
-            status: "processed",
-            amount: parsedAmount || 0,
-            currency: "INR",
-            speedProcessed: "optimum",
-            paymentId,
-            message: "Razorpay direct refund recorded back to original account."
-          });
-        }
-      } else {
-        // Development / Sandbox simulation mode
+      // When paymentId genuinely starts with "pay_test_" (intentional sandbox testing), keep simulating
+      if (isTestPayment) {
         const mockRefundId = `rfnd_test_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
         return res.status(200).json({
           success: true,
@@ -2799,21 +2768,85 @@ async function startServer() {
           currency: "INR",
           speedProcessed: "optimum",
           paymentId,
-          message: "Simulated Razorpay refund processed directly back to source account."
+          simulated: true,
+          message: "Simulated Razorpay refund processed directly back to source account (Sandbox test mode)."
+        });
+      }
+
+      const razorpay = getRazorpayClient();
+
+      if (!razorpay) {
+        return res.status(503).json({
+          success: false,
+          error: "Razorpay payment gateway secret is not configured on the server. Refund cannot be processed automatically.",
+          message: "Razorpay payment gateway secret is not configured on the server. Refund cannot be processed automatically.",
+          paymentId
+        });
+      }
+
+      try {
+        const refundPayload: any = {
+          speed: "optimum",
+          notes: {
+            orderId: orderId || "N/A",
+            reason: reason || "Order cancelled by customer within 2-minute window"
+          }
+        };
+        if (amountInPaise) {
+          refundPayload.amount = amountInPaise;
+        }
+
+        const refundResult = await razorpay.payments.refund(paymentId, refundPayload);
+
+        return res.status(200).json({
+          success: true,
+          refundId: refundResult.id,
+          status: refundResult.status || "processed",
+          amount: refundResult.amount ? refundResult.amount / 100 : parsedAmount,
+          currency: refundResult.currency || "INR",
+          speedProcessed: refundResult.speed_processed || "optimum",
+          paymentId,
+          message: "Refund initiated successfully by Razorpay directly back to user's account."
+        });
+      } catch (apiErr: any) {
+        console.error("[Razorpay Refund API Error]:", apiErr?.error || apiErr?.message || apiErr);
+        const errorMessage =
+          apiErr?.error?.description ||
+          apiErr?.message ||
+          "Razorpay refund request failed.";
+        return res.status(apiErr?.statusCode || 400).json({
+          success: false,
+          error: errorMessage,
+          message: errorMessage,
+          paymentId
         });
       }
     } catch (err: any) {
       console.error("Razorpay refund processing error:", err);
-      const mockRefundId = `rfnd_test_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
-      return res.status(200).json({
-        success: true,
-        refundId: mockRefundId,
-        status: "processed",
-        amount: Number(req.body?.amount || 0),
-        currency: "INR",
-        speedProcessed: "optimum",
-        paymentId: req.body?.paymentId || "pay_test",
-        message: "Razorpay direct refund registered."
+      const isTestPayment = String(req.body?.paymentId || "").startsWith("pay_test_");
+      if (isTestPayment) {
+        const mockRefundId = `rfnd_test_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+        return res.status(200).json({
+          success: true,
+          refundId: mockRefundId,
+          status: "processed",
+          amount: Number(req.body?.amount || 0),
+          currency: "INR",
+          speedProcessed: "optimum",
+          paymentId: req.body?.paymentId,
+          simulated: true,
+          message: "Simulated refund processed."
+        });
+      }
+      const errorMessage =
+        err?.error?.description ||
+        err?.message ||
+        "Failed to process Razorpay refund.";
+      return res.status(500).json({
+        success: false,
+        error: errorMessage,
+        message: errorMessage,
+        paymentId: req.body?.paymentId
       });
     }
   });
