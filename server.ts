@@ -2517,9 +2517,14 @@ async function startServer() {
   // =========================================================================
   const DEFAULT_RAZORPAY_KEY_ID = "rzp_test_TZw5E2BUHZrnOU";
 
+  function sanitizeEnvValue(val?: string): string {
+    if (!val) return "";
+    return val.trim().replace(/^["']|["']$/g, "").trim();
+  }
+
   function isValidRazorpayKeyId(keyId: string): boolean {
     if (!keyId) return false;
-    const trimmed = keyId.trim();
+    const trimmed = sanitizeEnvValue(keyId);
     // Real Razorpay keys start with rzp_test_ or rzp_live_ followed by alphanumeric characters
     return (
       (trimmed.startsWith("rzp_test_") || trimmed.startsWith("rzp_live_")) &&
@@ -2529,16 +2534,20 @@ async function startServer() {
     );
   }
 
+  function resolveRawRazorpayKeyId(): string {
+    return sanitizeEnvValue(process.env.RAZORPAY_KEY_ID || process.env.VITE_RAZORPAY_KEY_ID);
+  }
+
   function resolveRazorpayKeyId(): string {
-    const envKey = (process.env.RAZORPAY_KEY_ID || process.env.VITE_RAZORPAY_KEY_ID || "").trim();
+    const envKey = resolveRawRazorpayKeyId();
     if (isValidRazorpayKeyId(envKey)) {
       return envKey;
     }
-    return DEFAULT_RAZORPAY_KEY_ID;
+    return "";
   }
 
   function resolveRazorpayKeySecret(): string | null {
-    const envSecret = (process.env.RAZORPAY_KEY_SECRET || "").trim();
+    const envSecret = sanitizeEnvValue(process.env.RAZORPAY_KEY_SECRET || process.env.VITE_RAZORPAY_KEY_SECRET);
     if (envSecret && envSecret.length >= 8) {
       return envSecret;
     }
@@ -2546,9 +2555,12 @@ async function startServer() {
   }
 
   let razorpayClientInstance: any = null;
+  let authNoticeLogged = false;
+
   function getRazorpayClient(): any {
     const keyId = resolveRazorpayKeyId();
     const keySecret = resolveRazorpayKeySecret();
+    // NEVER pair default or invalid keys with user secrets (causes authentication failed)
     if (!isValidRazorpayKeyId(keyId) || !keySecret || keySecret.length < 8) {
       return null;
     }
@@ -2569,14 +2581,27 @@ async function startServer() {
   // 1. GET /api/razorpay/config - Fetch public key & payment configuration
   app.get("/api/razorpay/config", (req, res) => {
     res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
+    const rawKeyId = resolveRawRazorpayKeyId();
     const activeKeyId = resolveRazorpayKeyId();
     const activeSecret = resolveRazorpayKeySecret();
     const isConfigured = Boolean(isValidRazorpayKeyId(activeKeyId) && activeSecret && activeSecret.length >= 8);
 
+    let diagnostic = "";
+    if (!isValidRazorpayKeyId(rawKeyId)) {
+      if (!rawKeyId) {
+        diagnostic = "RAZORPAY_KEY_ID is missing. Please set your Razorpay Key ID (starts with rzp_live_ or rzp_test_).";
+      } else {
+        diagnostic = `RAZORPAY_KEY_ID '${rawKeyId}' is invalid. It must start with rzp_live_ or rzp_test_ and be at least 14 characters.`;
+      }
+    } else if (!activeSecret) {
+      diagnostic = "RAZORPAY_KEY_SECRET is missing or too short.";
+    }
+
     res.json({
       success: true,
-      keyId: activeKeyId,
+      keyId: activeKeyId || "rzp_test_sandbox",
       isConfigured,
+      diagnostic: diagnostic || undefined,
       merchantName: "BuildNow",
       currency: "INR"
     });
@@ -2618,7 +2643,11 @@ async function startServer() {
             isLive: true
           });
         } catch (apiErr: any) {
-          console.warn("[Razorpay API Error - falling back to sandbox mode]:", apiErr?.error || apiErr?.message || apiErr);
+          const errMsg = apiErr?.error?.description || apiErr?.message || "Authentication error";
+          if (!authNoticeLogged) {
+            authNoticeLogged = true;
+            console.warn(`[Razorpay Notice]: ${errMsg}. Check that RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET match in environment settings. Falling back to sandbox test gateway.`);
+          }
           // Invalidate cached client if authentication failed
           razorpayClientInstance = null;
 
@@ -2628,24 +2657,31 @@ async function startServer() {
             orderId: mockOrderId,
             amount: amountInPaise,
             currency: "INR",
-            keyId: activeKeyId,
+            keyId: activeKeyId || "rzp_test_sandbox",
             isLive: false,
             isSimulated: true,
-            warning: "Razorpay credentials could not be authenticated. Sandbox test gateway active."
+            warning: `Razorpay credentials could not be authenticated (${errMsg}). Sandbox test gateway active.`
           });
         }
       } else {
         // Safe development simulation fallback when live credentials are not set or invalid
+        const rawKeyId = resolveRawRazorpayKeyId();
+        const activeSecret = resolveRazorpayKeySecret();
+        let reason = "Razorpay credentials not fully configured.";
+        if (activeSecret && !isValidRazorpayKeyId(rawKeyId)) {
+          reason = `RAZORPAY_KEY_SECRET is set, but RAZORPAY_KEY_ID is missing or invalid (current: '${rawKeyId || "empty"}'). Real keys start with 'rzp_live_' or 'rzp_test_'.`;
+        }
+
         const mockOrderId = `order_test_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
         return res.status(200).json({
           success: true,
           orderId: mockOrderId,
           amount: amountInPaise,
           currency: "INR",
-          keyId: activeKeyId,
+          keyId: activeKeyId || "rzp_test_sandbox",
           isLive: false,
           isSimulated: true,
-          note: "Razorpay keys not configured or invalid in environment. Using test gateway mode."
+          note: reason
         });
       }
     } catch (err: any) {
@@ -5010,8 +5046,9 @@ Respond ONLY with a valid JSON object matching the following structure:
   const distPath = path.join(process.cwd(), "dist");
   const distExists = fs.existsSync(path.join(distPath, "index.html"));
 
-  // Vite middleware for development mode
-  const isProduction = process.env.NODE_ENV === "production";
+  // Vite middleware for development mode vs compiled production bundle
+  const isCompiledBundle = typeof __filename !== "undefined" && (__filename.includes("dist") || __filename.endsWith(".cjs"));
+  const isProduction = process.env.NODE_ENV === "production" || isCompiledBundle;
 
   if (!isProduction) {
     console.log("Starting Vite development middleware...");
