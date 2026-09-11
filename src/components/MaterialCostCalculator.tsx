@@ -28,7 +28,6 @@ import {
   PlusCircle
 } from 'lucide-react';
 import { Product, CartItem } from '../types';
-import { INITIAL_PRODUCTS } from '../data/products';
 import { API_BASE_URL } from '../lib/apiBase';
 
 interface MaterialCostCalculatorProps {
@@ -98,9 +97,9 @@ export const MaterialCostCalculator: React.FC<MaterialCostCalculatorProps> = ({
   const [catalogSearch, setCatalogSearch] = useState<string>('');
   const [catalogCategory, setCatalogCategory] = useState<'all' | 'electrical' | 'construction'>('all');
 
-  // Available backend store products
+  // Available backend store products (strictly real Supabase products)
   const availableProducts = useMemo(() => {
-    return products && products.length > 0 ? products : INITIAL_PRODUCTS;
+    return products || [];
   }, [products]);
 
   // Filter available catalog products by category & search - showing backend items
@@ -378,7 +377,7 @@ export const MaterialCostCalculator: React.FC<MaterialCostCalculatorProps> = ({
         keywords?: string[];
       }
     ): { matchedProduct: Product | null; inStock: boolean; stockCount: number } => {
-      const storeCatalog = products && products.length > 0 ? products : INITIAL_PRODUCTS;
+      const storeCatalog = availableProducts;
 
       // 1. Direct ID match if it's already an existing store catalog ID
       let matched = storeCatalog.find((p) => p.id === id);
@@ -659,7 +658,7 @@ export const MaterialCostCalculator: React.FC<MaterialCostCalculatorProps> = ({
     // Add custom selected items from catalog (verifying their live stock)
     customSelectedItems.forEach((item) => {
       if (item.quantity > 0) {
-        const storeCatalog = products && products.length > 0 ? products : INITIAL_PRODUCTS;
+        const storeCatalog = availableProducts;
         const catalogMatch = storeCatalog.find((p) => p.id === item.product.id);
         const inStock = Boolean(
           catalogMatch

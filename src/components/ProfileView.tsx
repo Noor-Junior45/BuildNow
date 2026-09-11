@@ -31,7 +31,6 @@ import {
   cleanPhoneAutofill
 } from '../services/supabaseService';
 import { getFavoriteProductIds, toggleProductFavorite, clearAllFavorites } from '../services/favorites';
-import { INITIAL_PRODUCTS } from '../data/products';
 
 // Sub-page component modules for each button in Profile
 import { FavoritesSubPage } from './profile/FavoritesSubPage';
@@ -89,7 +88,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
 
   // Favorites state
   const [favoriteProductIds, setFavoriteProductIds] = useState<string[]>(() => getFavoriteProductIds());
-  const [allCatalogProducts, setAllCatalogProducts] = useState<Product[]>(() => (allProducts && allProducts.length > 0 ? allProducts : INITIAL_PRODUCTS));
+  const [allCatalogProducts, setAllCatalogProducts] = useState<Product[]>(() => (allProducts && allProducts.length > 0 ? allProducts : []));
 
   useEffect(() => {
     if (allProducts && allProducts.length > 0) {

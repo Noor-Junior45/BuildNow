@@ -2,7 +2,6 @@ import { supabase } from '../lib/supabaseClient';
 import { User, Session, AuthChangeEvent } from '@supabase/supabase-js';
 import { Capacitor } from '@capacitor/core';
 import { Order, OrderStatus, WiringServiceBooking, SavedAddress, UserProfile, Product, CartItem, DeliveryPartner } from '../types';
-import { INITIAL_PRODUCTS } from '../data/products';
 import { soundService } from './sound';
 import { showToast } from '../utils/toast';
 import { API_BASE_URL } from '../lib/apiBase';
@@ -3202,7 +3201,11 @@ export async function syncAllProductsToSupabase(
   customProducts?: Product[]
 ): Promise<{ success: boolean; count: number; error?: string }> {
   try {
-    const productsToSync = customProducts || INITIAL_PRODUCTS;
+    const productsToSync = (customProducts || []).filter((p) => {
+      const name = String(p.name || '').trim().toLowerCase();
+      const brand = String(p.brand || '').trim().toLowerCase();
+      return name !== 'demo' && !name.includes('demo product') && brand !== 'demo';
+    });
     const rows = productsToSync.map((p) => {
       const price = Number(p.price || 0);
       const mrp = Number(p.originalPrice || price);
@@ -3366,7 +3369,7 @@ export async function fetchProductsFromSupabase(): Promise<Product[]> {
       .order('id', { ascending: true });
 
     if (!error && data) {
-      return data.map((row) => {
+      const dbProducts: Product[] = data.map((row): Product => {
         const rawImageUrls: string[] = Array.isArray(row.image_urls)
           ? row.image_urls.filter((u: any) => typeof u === 'string' && u.trim().length > 0)
           : typeof row.image_urls === 'string' && row.image_urls.startsWith('http')
@@ -3423,6 +3426,8 @@ export async function fetchProductsFromSupabase(): Promise<Product[]> {
           description: row.description || ''
         };
       });
+
+      return dbProducts;
     }
   } catch (err) {
     console.warn('Supabase products fetch error:', err);

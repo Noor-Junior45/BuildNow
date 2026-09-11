@@ -10,8 +10,9 @@ import { Capacitor } from '@capacitor/core';
  */
 export const API_BASE_URL: string = (() => {
   // 1. Prioritize explicit environment variable if set
-  if (import.meta.env.VITE_API_BASE_URL) {
-    return String(import.meta.env.VITE_API_BASE_URL).replace(/\/+$/, '');
+  const env = typeof import.meta !== 'undefined' && import.meta.env ? import.meta.env : (process.env as any || {});
+  if (env.VITE_API_BASE_URL) {
+    return String(env.VITE_API_BASE_URL).replace(/\/+$/, '');
   }
 
   if (typeof window === 'undefined') return '';

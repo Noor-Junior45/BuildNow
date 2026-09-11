@@ -18,6 +18,7 @@ export const CategorySearchBar: React.FC<CategorySearchBarProps> = ({
 
   const handleClear = () => {
     onSearchChange('');
+    window.dispatchEvent(new CustomEvent('clear-search-query'));
   };
 
   const handleSearchSubmit = (e?: React.FormEvent) => {
@@ -45,12 +46,13 @@ export const CategorySearchBar: React.FC<CategorySearchBarProps> = ({
         className="relative pointer-events-auto flex items-center w-full max-w-xl rounded-full bg-white/75 backdrop-blur-xl border border-slate-200/80 shadow-md hover:shadow-lg focus-within:shadow-lg focus-within:bg-white/95 focus-within:border-slate-400 transition-all duration-200"
       >
         <input
-          type="search"
+          type="text"
+          inputMode="search"
           value={searchQuery}
           onChange={(e) => onSearchChange(e.target.value)}
           onKeyDown={handleKeyDown}
           placeholder={placeholder}
-          className="w-full py-2.5 sm:py-3 pl-5 pr-20 bg-transparent text-sm sm:text-base text-slate-900 placeholder:text-slate-500 rounded-full focus:outline-none"
+          className="w-full py-2.5 sm:py-3 pl-5 pr-20 bg-transparent text-sm sm:text-base text-slate-900 placeholder:text-slate-500 rounded-full focus:outline-none [&::-webkit-search-cancel-button]:hidden [&::-webkit-search-decoration]:hidden"
         />
 
         {/* Right Action Icons: Cross Button (if query exists) & Scope (Search) Logo */}

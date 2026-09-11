@@ -8,6 +8,7 @@ import { fetchTechnicians } from '../../services/technicianService';
 import { TechnicianFiltersModal, TechnicianFilterState } from './TechnicianFiltersModal';
 import { TechnicianSortModal, TechnicianSortOption } from './TechnicianSortModal';
 import { hapticLight, hapticSelection } from '../../utils/haptics';
+import { getPaginationPages } from '../../utils/paginationHelper';
 
 interface TechniciansPageProps {
   searchQuery?: string;
@@ -34,7 +35,7 @@ export const TechniciansPage: React.FC<TechniciansPageProps> = ({
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const urlQuery = searchParams.get('q') || '';
-  const activeQuery = propSearchQuery || urlQuery;
+  const activeQuery = propSearchQuery !== undefined ? propSearchQuery : urlQuery;
 
   const [allTechnicians, setAllTechnicians] = useState<Technician[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -45,6 +46,35 @@ export const TechniciansPage: React.FC<TechniciansPageProps> = ({
 
   const [filters, setFilters] = useState<TechnicianFilterState>(INITIAL_FILTERS);
   const [sortOption, setSortOption] = useState<TechnicianSortOption>('recommended');
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 100;
+
+  // Sync with prop search or global clear
+  useEffect(() => {
+    if (propSearchQuery !== undefined && !propSearchQuery && searchParams.has('q')) {
+      const nextParams = new URLSearchParams(searchParams);
+      nextParams.delete('q');
+      setSearchParams(nextParams, { replace: true });
+    }
+  }, [propSearchQuery, searchParams, setSearchParams]);
+
+  useEffect(() => {
+    const handleGlobalClear = () => {
+      setCurrentPage(1);
+      if (searchParams.has('q')) {
+        const nextParams = new URLSearchParams(searchParams);
+        nextParams.delete('q');
+        setSearchParams(nextParams, { replace: true });
+      }
+    };
+    window.addEventListener('clear-search-query', handleGlobalClear);
+    return () => window.removeEventListener('clear-search-query', handleGlobalClear);
+  }, [searchParams, setSearchParams]);
+
+  // Reset to page 1 whenever search, filters, or sort change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [activeQuery, filters, sortOption]);
 
   const loadTechniciansData = () => {
     setIsLoading(true);
@@ -268,6 +298,14 @@ export const TechniciansPage: React.FC<TechniciansPageProps> = ({
         });
     }
   }, [filteredTechnicians, sortOption]);
+
+  // Paginated slices (100 technicians per page)
+  const paginatedTechnicians = useMemo(() => {
+    const start = (currentPage - 1) * itemsPerPage;
+    return sortedTechnicians.slice(start, start + itemsPerPage);
+  }, [sortedTechnicians, currentPage, itemsPerPage]);
+
+  const totalPages = Math.ceil(sortedTechnicians.length / itemsPerPage) || 1;
 
   const handleCardClick = (tech: Technician) => {
     if (onSelectTechnician) {
@@ -569,7 +607,7 @@ export const TechniciansPage: React.FC<TechniciansPageProps> = ({
         ) : (
           /* REAL TECHNICIANS GRID: 1 COL STACK ON MOBILE, 2X2 ON PC */
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-5 w-full">
-            {sortedTechnicians.map((tech) => (
+            {paginatedTechnicians.map((tech) => (
               <motion.div
                 key={tech.id}
                 initial={{ opacity: 0, y: 12 }}
@@ -579,6 +617,77 @@ export const TechniciansPage: React.FC<TechniciansPageProps> = ({
                 <TechnicianCard technician={tech} onSelect={handleCardClick} />
               </motion.div>
             ))}
+          </div>
+        )}
+
+        {/* PAGINATION CONTROLS (100 technicians per page) */}
+        {!isLoading && sortedTechnicians.length > itemsPerPage && (
+          <div className="pt-10 pb-6 flex flex-col items-center gap-4">
+            <p className="text-xs font-medium text-slate-500">
+              Showing <span className="font-bold text-slate-900">{Math.min(sortedTechnicians.length, (currentPage - 1) * itemsPerPage + 1)}</span> to{' '}
+              <span className="font-bold text-slate-900">{Math.min(sortedTechnicians.length, currentPage * itemsPerPage)}</span> of{' '}
+              <span className="font-bold text-slate-900">{sortedTechnicians.length}</span> certified specialists
+            </p>
+
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                disabled={currentPage <= 1}
+                onClick={() => {
+                  hapticLight();
+                  setCurrentPage((p) => Math.max(1, p - 1));
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                }}
+                className="px-3.5 py-2 rounded-xl border border-slate-200 bg-white text-xs font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition-colors shadow-2xs"
+              >
+                Previous
+              </button>
+
+              {getPaginationPages(currentPage, totalPages).map((item, idx) => {
+                if (typeof item === 'string') {
+                  return (
+                    <span
+                      key={`ellipsis-${idx}`}
+                      className="w-8 h-9 flex items-center justify-center text-xs font-bold text-slate-400 select-none"
+                    >
+                      ...
+                    </span>
+                  );
+                }
+                const pageNum = item as number;
+                return (
+                  <button
+                    key={pageNum}
+                    type="button"
+                    onClick={() => {
+                      hapticLight();
+                      setCurrentPage(pageNum);
+                      window.scrollTo({ top: 0, behavior: 'smooth' });
+                    }}
+                    className={`w-9 h-9 rounded-xl text-xs font-black transition-all cursor-pointer ${
+                      currentPage === pageNum
+                        ? 'bg-slate-900 text-white shadow-xs'
+                        : 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 shadow-2xs'
+                    }`}
+                  >
+                    {pageNum}
+                  </button>
+                );
+              })}
+
+              <button
+                type="button"
+                disabled={currentPage >= totalPages}
+                onClick={() => {
+                  hapticLight();
+                  setCurrentPage((p) => Math.min(totalPages, p + 1));
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                }}
+                className="px-3.5 py-2 rounded-xl border border-slate-200 bg-white text-xs font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition-colors shadow-2xs"
+              >
+                Next
+              </button>
+            </div>
           </div>
         )}
       </div>

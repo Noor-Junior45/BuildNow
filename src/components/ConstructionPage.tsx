@@ -24,9 +24,11 @@ import {
 import { Product } from '../types';
 import { supabase } from '../lib/supabaseClient';
 import { apiUrl } from '../lib/apiBase';
+import { isConstructionProduct, isElectricalProduct } from '../utils/categoryHelper';
 import { ProductCardImage } from './ProductCardImage';
 import { hapticLight, hapticSelection } from '../utils/haptics';
 import { getFlattenedSpecifications } from '../utils/productSpecifications';
+import { getPaginationPages } from '../utils/paginationHelper';
 
 interface ConstructionPageProps {
   onAddToCart: (product: Product) => void;
@@ -36,6 +38,7 @@ interface ConstructionPageProps {
   onOpenProductQuickView?: (product: Product) => void;
   searchQuery?: string;
   onSearchChange?: (query: string) => void;
+  products?: Product[];
 }
 
 export type SortOption = 'popularity' | 'price_asc' | 'price_desc' | 'rating' | 'newest';
@@ -112,7 +115,8 @@ export const ConstructionPage: React.FC<ConstructionPageProps> = ({
   onOpenCart,
   onOpenProductQuickView,
   searchQuery: propSearchQuery,
-  onSearchChange
+  onSearchChange,
+  products: initialProducts
 }) => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -121,8 +125,14 @@ export const ConstructionPage: React.FC<ConstructionPageProps> = ({
   const initialSubcategory = searchParams.get('subcategory');
   const initialSearch = searchParams.get('q') || propSearchQuery || '';
 
-  const [rawProducts, setRawProducts] = useState<Product[]>([]);
-  const [loading, setLoading] = useState(true);
+  // Initial products if preloaded from App
+  const preloadedConstruction = useMemo(() => {
+    if (!initialProducts || initialProducts.length === 0) return [];
+    return initialProducts.filter((p) => isConstructionProduct(p) && !isElectricalProduct(p));
+  }, [initialProducts]);
+
+  const [rawProducts, setRawProducts] = useState<Product[]>(() => preloadedConstruction);
+  const [loading, setLoading] = useState<boolean>(() => preloadedConstruction.length === 0);
 
   // Filters State
   const [filters, setFilters] = useState<ConstructionFilterState>({
@@ -141,19 +151,41 @@ export const ConstructionPage: React.FC<ConstructionPageProps> = ({
   const [isSortDropdownOpen, setIsSortDropdownOpen] = useState(false);
   const [activeDropdown, setActiveDropdown] = useState<'sort' | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 16;
+  const itemsPerPage = 100;
 
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   // Sync searchQuery when URL param or prop changes
   useEffect(() => {
-    const urlQ = searchParams.get('q');
-    if (urlQ !== null) {
-      setSearchQuery(urlQ);
-    } else if (propSearchQuery !== undefined) {
+    if (propSearchQuery !== undefined) {
       setSearchQuery(propSearchQuery);
+      if (!propSearchQuery && searchParams.has('q')) {
+        const nextParams = new URLSearchParams(searchParams);
+        nextParams.delete('q');
+        setSearchParams(nextParams, { replace: true });
+      }
+    } else {
+      const urlQ = searchParams.get('q');
+      if (urlQ !== null) {
+        setSearchQuery(urlQ);
+      }
     }
-  }, [searchParams, propSearchQuery]);
+  }, [searchParams, propSearchQuery, setSearchParams]);
+
+  // Listen to global clear-search-query event
+  useEffect(() => {
+    const handleGlobalClear = () => {
+      setSearchQuery('');
+      setCurrentPage(1);
+      if (searchParams.has('q')) {
+        const nextParams = new URLSearchParams(searchParams);
+        nextParams.delete('q');
+        setSearchParams(nextParams, { replace: true });
+      }
+    };
+    window.addEventListener('clear-search-query', handleGlobalClear);
+    return () => window.removeEventListener('clear-search-query', handleGlobalClear);
+  }, [searchParams, setSearchParams]);
 
   // Listen to open-all-filters and open-sort-dropdown events from top navbar
   useEffect(() => {
@@ -225,45 +257,9 @@ export const ConstructionPage: React.FC<ConstructionPageProps> = ({
       }
 
       if (rows.length > 0) {
-        // Filter rows that belong to construction category
+        // Strictly filter real construction items only (exclude electrical equipment)
         const constructionRows = rows.filter((row) => {
-          const cat = (row.category || '').toLowerCase().trim();
-          const sub = (row.subcategory || row.sub_category || '').toLowerCase().trim();
-          const name = (row.name || '').toLowerCase().trim();
-
-          // Exclude pure electrical products
-          if (cat === 'electrical') {
-            return false;
-          }
-
-          return (
-            cat.includes('construction') ||
-            cat.includes('cement') ||
-            cat.includes('plumbing') ||
-            cat.includes('paint') ||
-            cat.includes('hardware') ||
-            cat.includes('building') ||
-            cat.includes('material') ||
-            cat.includes('steel') ||
-            cat.includes('tmt') ||
-            cat.includes('tile') ||
-            cat.includes('bath') ||
-            cat.includes('sanitary') ||
-            cat.includes('wood') ||
-            cat.includes('plywood') ||
-            sub.includes('cement') ||
-            sub.includes('tmt') ||
-            sub.includes('pipe') ||
-            sub.includes('waterproof') ||
-            sub.includes('paint') ||
-            sub.includes('plywood') ||
-            sub.includes('steel') ||
-            sub.includes('bath') ||
-            sub.includes('hardware') ||
-            sub.includes('sink') ||
-            sub.includes('fitting') ||
-            sub.includes('adhesive')
-          );
+          return isConstructionProduct(row) && !isElectricalProduct(row);
         });
 
         if (constructionRows.length > 0) {
@@ -334,6 +330,13 @@ export const ConstructionPage: React.FC<ConstructionPageProps> = ({
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    if (preloadedConstruction.length > 0) {
+      setRawProducts((prev) => (prev.length === 0 ? preloadedConstruction : prev));
+      setLoading(false);
+    }
+  }, [preloadedConstruction]);
 
   useEffect(() => {
     loadConstructionProducts();
@@ -411,7 +414,9 @@ export const ConstructionPage: React.FC<ConstructionPageProps> = ({
     if (onSearchChange) onSearchChange('');
     const newParams = new URLSearchParams(searchParams);
     newParams.delete('q');
-    setSearchParams(newParams);
+    setSearchParams(newParams, { replace: true });
+    setCurrentPage(1);
+    window.dispatchEvent(new CustomEvent('clear-search-query'));
   };
 
   const displaySubcategories = useMemo(() => {
@@ -557,6 +562,7 @@ export const ConstructionPage: React.FC<ConstructionPageProps> = ({
   }, [filteredAndSortedProducts, currentPage]);
 
   const totalCount = filteredAndSortedProducts.length;
+  const totalPages = Math.ceil(filteredAndSortedProducts.length / itemsPerPage) || 1;
 
   // Helper to check cart quantity
   const getProductCartQty = (productId: string) => {
@@ -927,6 +933,77 @@ export const ConstructionPage: React.FC<ConstructionPageProps> = ({
                 </div>
               );
             })}
+          </div>
+        )}
+
+        {/* PAGINATION & LOAD MORE CONTROLS */}
+        {!loading && hasBackendProducts && filteredAndSortedProducts.length > itemsPerPage && (
+          <div className="pt-10 pb-6 flex flex-col items-center gap-4">
+            <p className="text-xs font-medium text-slate-500">
+              Showing <span className="font-bold text-slate-900">{Math.min(filteredAndSortedProducts.length, (currentPage - 1) * itemsPerPage + 1)}</span> to{' '}
+              <span className="font-bold text-slate-900">{Math.min(filteredAndSortedProducts.length, currentPage * itemsPerPage)}</span> of{' '}
+              <span className="font-bold text-slate-900">{filteredAndSortedProducts.length}</span> construction materials
+            </p>
+
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                disabled={currentPage <= 1}
+                onClick={() => {
+                  hapticLight();
+                  setCurrentPage((p) => Math.max(1, p - 1));
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                }}
+                className="px-3.5 py-2 rounded-xl border border-slate-200 bg-white text-xs font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition-colors shadow-2xs"
+              >
+                Previous
+              </button>
+
+              {getPaginationPages(currentPage, totalPages).map((item, idx) => {
+                if (typeof item === 'string') {
+                  return (
+                    <span
+                      key={`ellipsis-${idx}`}
+                      className="w-8 h-9 flex items-center justify-center text-xs font-bold text-slate-400 select-none"
+                    >
+                      ...
+                    </span>
+                  );
+                }
+                const pageNum = item as number;
+                return (
+                  <button
+                    key={pageNum}
+                    type="button"
+                    onClick={() => {
+                      hapticLight();
+                      setCurrentPage(pageNum);
+                      window.scrollTo({ top: 0, behavior: 'smooth' });
+                    }}
+                    className={`w-9 h-9 rounded-xl text-xs font-black transition-all cursor-pointer ${
+                      currentPage === pageNum
+                        ? 'bg-slate-900 text-white shadow-xs'
+                        : 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 shadow-2xs'
+                    }`}
+                  >
+                    {pageNum}
+                  </button>
+                );
+              })}
+
+              <button
+                type="button"
+                disabled={currentPage >= totalPages}
+                onClick={() => {
+                  hapticLight();
+                  setCurrentPage((p) => Math.min(totalPages, p + 1));
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                }}
+                className="px-3.5 py-2 rounded-xl border border-slate-200 bg-white text-xs font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition-colors shadow-2xs"
+              >
+                Next
+              </button>
+            </div>
           </div>
         )}
       </div>

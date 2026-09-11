@@ -5064,6 +5064,34 @@ Respond ONLY with a valid JSON object matching the following structure:
   const isCompiledBundle = typeof __filename !== "undefined" && (__filename.includes("dist") || __filename.endsWith(".cjs"));
   const isProduction = process.env.NODE_ENV === "production" || isCompiledBundle;
 
+  const publicPath = path.join(process.cwd(), "public");
+  if (fs.existsSync(publicPath)) {
+    app.use(express.static(publicPath));
+  }
+
+  // Intercept nested asset paths (e.g., /electrical/assets/... or /orders/assets/...)
+  app.use((req, res, next) => {
+    const assetIdx = req.path.indexOf("/assets/");
+    if (assetIdx !== -1) {
+      const rewritten = req.path.substring(assetIdx);
+      const resolvedFile = path.join(distPath, rewritten);
+      if (fs.existsSync(resolvedFile)) {
+        return res.sendFile(resolvedFile);
+      }
+    }
+    next();
+  });
+
+  if (fs.existsSync(path.join(distPath, "assets"))) {
+    app.use(
+      "/assets",
+      express.static(path.join(distPath, "assets"), {
+        maxAge: "365d",
+        immutable: true
+      })
+    );
+  }
+
   if (!isProduction) {
     console.log("Starting Vite development middleware...");
     const vite = await createViteServer({
@@ -5076,7 +5104,20 @@ Respond ONLY with a valid JSON object matching the following structure:
     app.use(vite.middlewares);
   } else {
     console.log("Serving pre-compiled production build from dist/ (Vite dev server OFF)...");
-    // 1. Immutable Long-term Caching for Bundled Hashed Assets (JS, CSS, Media)
+    // 1. Intercept nested asset paths (e.g., /electrical/assets/... or /orders/assets/...)
+    app.use((req, res, next) => {
+      const assetIdx = req.path.indexOf("/assets/");
+      if (assetIdx !== -1) {
+        const rewritten = req.path.substring(assetIdx);
+        const resolvedFile = path.join(distPath, rewritten);
+        if (fs.existsSync(resolvedFile)) {
+          return res.sendFile(resolvedFile);
+        }
+      }
+      next();
+    });
+
+    // 1b. Immutable Long-term Caching for Bundled Hashed Assets (JS, CSS, Media)
     app.use(
       "/assets",
       express.static(path.join(distPath, "assets"), {
@@ -5115,5 +5156,16 @@ Respond ONLY with a valid JSON object matching the following structure:
   });
 }
 
-startServer();
+// Global crash-prevention handlers to keep dev server running smoothly in AI Studio
+process.on("unhandledRejection", (reason, promise) => {
+  console.warn("[DevServer] Unhandled Rejection at:", promise, "reason:", reason);
+});
+
+process.on("uncaughtException", (err) => {
+  console.error("[DevServer] Uncaught Exception:", err);
+});
+
+startServer().catch((err) => {
+  console.error("[DevServer] Fatal error during startServer:", err);
+});
 

@@ -33,6 +33,7 @@ import {
 import { isProductFavorite, toggleProductFavorite } from '../../services/favorites';
 import { Product, UserProfile } from '../../types';
 import { supabase } from '../../lib/supabaseClient';
+import { isConstructionProduct } from '../../utils/categoryHelper';
 import { ProductCardImage } from '../ProductCardImage';
 import {
   isWireProduct,
@@ -339,11 +340,7 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
     return product ? Number(product.rating_avg || 0) : 0;
   }, [reviews, product]);
 
-  const isConstructionCategory = (product?.category || '').toLowerCase().includes('construction') ||
-    (product?.subcategory || '').toLowerCase().includes('cement') ||
-    (product?.subcategory || '').toLowerCase().includes('tmt') ||
-    (product?.subcategory || '').toLowerCase().includes('waterproof') ||
-    (product?.subcategory || '').toLowerCase().includes('paint');
+  const isConstructionCategory = product ? isConstructionProduct(product) : false;
   const catalogBackRoute = isConstructionCategory ? '/construction' : '/electrical';
   const catalogBackTitle = isConstructionCategory ? 'Back to Construction Store' : 'Back to Electrical Store';
 

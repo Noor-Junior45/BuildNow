@@ -1,6 +1,5 @@
 import { supabase } from '../lib/supabaseClient';
 import { CartItem, Product } from '../types';
-import { INITIAL_PRODUCTS } from '../data/products';
 import { getActiveUserScope } from './supabaseService';
 
 export interface SavedItemRecord {
@@ -139,8 +138,7 @@ export async function fetchCartItemsFromSupabase(): Promise<CartItem[] | null> {
           tags: p.tags || []
         };
       } else {
-        const fallback = INITIAL_PRODUCTS.find((ip) => String(ip.id) === String(row.product_id));
-        product = fallback || {
+        product = {
           id: String(row.product_id),
           name: 'Electrical Item',
           brand: 'Giriraj Power',
@@ -287,7 +285,7 @@ export async function fetchSavedItemsFromSupabase(): Promise<SavedItemRecord[]> 
                 description: p.description || '',
                 tags: p.tags || []
               }
-            : INITIAL_PRODUCTS.find((ip) => ip.id === row.product_id) || {
+            : {
                 id: row.product_id,
                 name: 'Saved Item',
                 brand: 'Giriraj Power',

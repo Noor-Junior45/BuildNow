@@ -14,11 +14,12 @@ export const FloatingLiveOrderButton: React.FC<FloatingLiveOrderButtonProps> = (
 }) => {
   const location = useLocation();
 
-  // Condition: Only show when order exists, NOT on profile or live-order pages, and NOT yet delivered or cancelled/failed
+  // Condition: Only show when order exists, NOT on profile, live-order, or cart pages, and NOT yet delivered or cancelled/failed
   if (
     !order ||
     location.pathname.startsWith('/profile') ||
     location.pathname.startsWith('/live-order') ||
+    location.pathname.startsWith('/cart') ||
     order.status === 'delivered' ||
     order.status === 'cancelled' ||
     order.status === 'failed'

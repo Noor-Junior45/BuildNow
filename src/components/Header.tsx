@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useMemo, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Zap, ShoppingBag, User, ChevronDown, Home, Briefcase, Building2, MapPin, Wrench, Search, X, SlidersHorizontal, ArrowUpDown } from 'lucide-react';
-import { KolkataArea, SavedAddress, UserProfile } from '../types';
-import { detectQueryCategory } from '../utils/searchHelper';
+import { Zap, ShoppingBag, User, ChevronDown, Home, Briefcase, Building2, MapPin, Wrench, Search, X, SlidersHorizontal, ArrowUpDown, ArrowRight, Check } from 'lucide-react';
+import { KolkataArea, SavedAddress, UserProfile, Product } from '../types';
+import { detectQueryCategory, searchAllProducts } from '../utils/searchHelper';
+import { isConstructionProduct } from '../utils/categoryHelper';
 import { hapticLight, hapticSelection } from '../utils/haptics';
 
 interface HeaderProps {
@@ -11,6 +12,7 @@ interface HeaderProps {
   onOpenLocationModal: () => void;
   searchQuery?: string;
   onSearchChange?: (query: string) => void;
+  allProducts?: Product[];
   cartCount?: number;
   cartTotal?: number;
   onOpenCart?: () => void;
@@ -59,6 +61,7 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenLocationModal,
   searchQuery = '',
   onSearchChange,
+  allProducts = [],
   cartCount = 0,
   cartTotal = 0,
   onOpenCart,
@@ -75,6 +78,8 @@ export const Header: React.FC<HeaderProps> = ({
 }) => {
   const [imgError, setImgError] = useState(false);
   const [isMobileSearchOpen, setIsMobileSearchOpen] = useState(false);
+  const [isSearchFocused, setIsSearchFocused] = useState(false);
+  const searchDropdownRef = useRef<HTMLFormElement>(null);
   const navigate = useNavigate();
   const location = useLocation();
   const locationInfo = getHeaderDisplayLocation(currentArea, activeAddress);
@@ -93,6 +98,31 @@ export const Header: React.FC<HeaderProps> = ({
     currentPath.startsWith('/electrical') ||
     currentPath.startsWith('/construction');
 
+  // Close live search dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (searchDropdownRef.current && !searchDropdownRef.current.contains(e.target as Node)) {
+        setIsSearchFocused(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // Live matching products across the entire database (excluding demo items)
+  const searchResultsData = useMemo(() => {
+    const q = (searchQuery || '').trim();
+    if (!q || isTechniciansPage) {
+      return { results: [], electricalCount: 0, constructionCount: 0, suggestedCategory: 'electrical' as const };
+    }
+    const filteredCatalog = (allProducts || []).filter((p) => {
+      const name = String(p.name || '').trim().toLowerCase();
+      const brand = String(p.brand || '').trim().toLowerCase();
+      return name !== 'demo' && !name.includes('demo product') && brand !== 'demo';
+    });
+    return searchAllProducts(q, filteredCatalog, 6);
+  }, [searchQuery, allProducts, isTechniciansPage]);
+
   // Instant Enter key handler for search input - navigates directly without delay
   const handleSearchSubmit = (e?: React.FormEvent) => {
     if (e) {
@@ -101,6 +131,7 @@ export const Header: React.FC<HeaderProps> = ({
     const q = (searchQuery || '').trim();
 
     if (isTechniciansPage) {
+      setIsSearchFocused(false);
       hapticSelection();
       navigate(`/technicians${q ? `?q=${encodeURIComponent(q)}` : ''}`);
       return;
@@ -108,10 +139,13 @@ export const Header: React.FC<HeaderProps> = ({
 
     if (!q) return;
 
-    // Detect target store category (electrical or construction) immediately
-    const targetCategory = detectQueryCategory(q);
+    // Detect target store category (electrical or construction) from whole database
+    const targetCategory = detectQueryCategory(q, allProducts, activeCategory);
     const targetPath = targetCategory === 'construction' ? '/construction' : '/electrical';
     const targetUrl = `${targetPath}?q=${encodeURIComponent(q)}`;
+
+    // Close live dropdown
+    setIsSearchFocused(false);
 
     // Sync active category & close mobile search
     hapticSelection();
@@ -128,6 +162,32 @@ export const Header: React.FC<HeaderProps> = ({
       e.preventDefault();
       handleSearchSubmit();
     }
+  };
+
+  const handleClearSearch = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    hapticLight();
+    setIsSearchFocused(false);
+
+    if (onSearchChange) {
+      onSearchChange('');
+    }
+
+    const params = new URLSearchParams(location.search);
+    if (params.has('q')) {
+      params.delete('q');
+      const nextQ = params.toString();
+      navigate(`${location.pathname}${nextQ ? `?${nextQ}` : ''}`, { replace: true });
+    }
+
+    const el = document.getElementById('universal-search-input') as HTMLInputElement | null;
+    if (el) {
+      el.value = '';
+      el.focus();
+    }
+
+    window.dispatchEvent(new CustomEvent('clear-search-query'));
   };
 
   // Check login state from profile, phone, name, email or photo
@@ -282,7 +342,12 @@ export const Header: React.FC<HeaderProps> = ({
       <div className="border-t border-slate-100/80 bg-gradient-to-b from-white/80 to-white/95 backdrop-blur-md px-3 sm:px-6 py-2 sm:py-2.5">
         <div className="max-w-3xl mx-auto w-full flex items-center gap-2 sm:gap-3">
           {/* Reduced Search Bar */}
-          <form onSubmit={handleSearchSubmit} className="relative flex-1 group" role="search">
+          <form
+            ref={searchDropdownRef}
+            onSubmit={handleSearchSubmit}
+            className="relative flex-1 group"
+            role="search"
+          >
             <div className="relative flex items-center w-full rounded-full backdrop-blur-xl bg-slate-100/80 hover:bg-slate-100/95 focus-within:bg-white border border-slate-200/80 focus-within:border-[#00875a]/50 focus-within:ring-2 focus-within:ring-[#00875a]/20 shadow-[0_2px_12px_rgba(0,0,0,0.03)] focus-within:shadow-[0_4px_20px_rgba(0,135,90,0.12)] transition-all duration-200">
               {/* Google-style Magnifying Glass Icon */}
               <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-[#00875a] pointer-events-none transition-colors">
@@ -291,30 +356,127 @@ export const Header: React.FC<HeaderProps> = ({
 
               <input
                 id="universal-search-input"
-                type="search"
+                type="text"
+                inputMode="search"
                 value={searchQuery || ''}
-                onChange={(e) => onSearchChange && onSearchChange(e.target.value)}
+                onChange={(e) => {
+                  if (onSearchChange) onSearchChange(e.target.value);
+                  if (!isSearchFocused) setIsSearchFocused(true);
+                }}
+                onFocus={() => setIsSearchFocused(true)}
                 onKeyDown={handleKeyDown}
                 placeholder={
                   isTechniciansPage
                     ? 'Search technician, skill (e.g. Solar, Switchgear)...'
-                    : 'Search products, electrical cables, switches, brands...'
+                    : 'Search products, cement, TMT, cables, switches, brands...'
                 }
-                className="w-full bg-transparent text-slate-900 placeholder:text-slate-400 text-xs sm:text-sm pl-9 sm:pl-10 pr-8 sm:pr-9 py-1.5 sm:py-2 rounded-full focus:outline-none"
+                className="w-full bg-transparent text-slate-900 placeholder:text-slate-400 text-xs sm:text-sm pl-9 sm:pl-10 pr-9 sm:pr-10 py-1.5 sm:py-2 rounded-full focus:outline-none [&::-webkit-search-cancel-button]:hidden [&::-webkit-search-decoration]:hidden"
               />
 
-              {searchQuery && (
+              {Boolean(searchQuery && searchQuery.length > 0) && (
                 <button
+                  id="header-clear-search-btn"
                   type="button"
-                  onClick={() => onSearchChange && onSearchChange('')}
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 w-5 h-5 flex items-center justify-center rounded-full bg-slate-200 hover:bg-slate-300 text-slate-600 text-xs transition-colors cursor-pointer"
+                  onClick={handleClearSearch}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 w-5 h-5 flex items-center justify-center rounded-full bg-slate-200/90 hover:bg-slate-300 active:bg-slate-400 text-slate-600 hover:text-slate-900 transition-colors cursor-pointer z-10"
                   title="Clear search"
                   aria-label="Clear search"
                 >
-                  ✕
+                  <X className="w-3.5 h-3.5" />
                 </button>
               )}
             </div>
+
+            {/* Live Database Search Results Dropdown */}
+            {isSearchFocused && Boolean((searchQuery || '').trim().length > 0) && !isTechniciansPage && (
+              <div
+                id="header-live-search-dropdown"
+                className="absolute top-full left-0 right-0 mt-2 bg-white rounded-2xl shadow-2xl border border-slate-200/90 overflow-hidden z-50 animate-in fade-in slide-in-from-top-2 duration-150"
+              >
+                {/* Header Summary */}
+                <div className="flex items-center justify-between px-3.5 py-2 bg-slate-50 border-b border-slate-100 text-xs text-slate-500">
+                  <span className="font-semibold text-slate-700">Matching Products</span>
+                  <span className="text-[11px] text-slate-400">
+                    {searchResultsData.results.length > 0 ? `${searchResultsData.results.length} found` : 'Press Enter to search'}
+                  </span>
+                </div>
+
+                {/* Product List */}
+                {searchResultsData.results.length > 0 ? (
+                  <div className="divide-y divide-slate-100 max-h-72 overflow-y-auto">
+                    {searchResultsData.results.map((product) => {
+                      const isConst = isConstructionProduct(product);
+                      return (
+                        <button
+                          key={product.id}
+                          type="button"
+                          onClick={() => {
+                            hapticSelection();
+                            setIsSearchFocused(false);
+                            if (isConst) {
+                              onSelectCategory('construction');
+                              onTabChange('construction');
+                              navigate(`/construction?q=${encodeURIComponent(product.name)}`);
+                            } else {
+                              onSelectCategory('electrical');
+                              onTabChange('electrical');
+                              navigate(`/electrical?q=${encodeURIComponent(product.name)}`);
+                            }
+                          }}
+                          className="w-full px-3.5 py-2.5 flex items-center gap-3 hover:bg-slate-50 transition-colors text-left group"
+                        >
+                          <img
+                            src={product.image || (product.images && product.images[0]) || ''}
+                            alt={product.name}
+                            className="w-10 h-10 object-contain rounded-lg bg-slate-50 border border-slate-200/80 p-0.5 shrink-0 group-hover:scale-105 transition-transform"
+                            onError={(e) => {
+                              (e.currentTarget as HTMLElement).style.display = 'none';
+                            }}
+                          />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs sm:text-sm font-semibold text-slate-900 truncate group-hover:text-[#00875a] transition-colors">
+                              {product.name}
+                            </p>
+                            <p className="text-[11px] text-slate-500 truncate">
+                              {product.brand} • {product.subCategory}
+                            </p>
+                          </div>
+                          <div className="flex flex-col items-end shrink-0 pl-2">
+                            <span className="text-xs sm:text-sm font-bold text-slate-900">
+                              ₹{product.price}
+                            </span>
+                            <span
+                              className={`text-[10px] font-semibold px-1.5 py-0.2 rounded mt-0.5 ${
+                                isConst
+                                  ? 'bg-amber-100 text-amber-800'
+                                  : 'bg-emerald-100 text-emerald-800'
+                              }`}
+                            >
+                              {isConst ? 'Construction' : 'Electrical'}
+                            </span>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="px-4 py-4 text-center text-xs text-slate-500">
+                    Press <span className="font-semibold text-slate-700">Enter</span> to search the full database for "{searchQuery}"
+                  </div>
+                )}
+
+                {/* Bottom Search Action */}
+                <div className="px-3 py-2 bg-slate-50 border-t border-slate-100">
+                  <button
+                    type="button"
+                    onClick={() => handleSearchSubmit()}
+                    className="w-full py-2 px-3 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-semibold text-xs text-center transition-colors"
+                  >
+                    View all results for "{searchQuery}" →
+                  </button>
+                </div>
+              </div>
+            )}
           </form>
 
           {/* Right Side: All Filters Button & Sort / Relevance Button */}

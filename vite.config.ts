@@ -10,7 +10,7 @@ const BUILD_ID = process.env.BUILD_ID || process.env.VITE_APP_BUILD_ID || `v${AP
 
 export default defineConfig(({ command }) => {
   return {
-    base: command === 'serve' ? '/' : './',
+    base: process.env.CAPACITOR_BUILD ? './' : '/',
     plugins: [
       react(),
       tailwindcss(),

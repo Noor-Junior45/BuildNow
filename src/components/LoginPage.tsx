@@ -88,6 +88,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onAuthSuccess }) => {
   // Progressive field reveal states
   const [showSecondField, setShowSecondField] = useState(false);
   const [otpSent, setOtpSent] = useState(false);
+  const [sentToPhone, setSentToPhone] = useState('');
 
   // Timers
   const [magicLinkCooldown, setMagicLinkCooldown] = useState(0);
@@ -172,6 +173,9 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onAuthSuccess }) => {
     try {
       const { error: otpError } = await supabase.auth.signInWithOtp({
         phone: phone,
+        options: {
+          shouldCreateUser: true,
+        },
       });
 
       if (otpError) {
@@ -181,10 +185,11 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onAuthSuccess }) => {
           setError(otpError.message || 'Failed to send OTP to mobile number. Please try again.');
         }
       } else {
+        setSentToPhone(phone);
         setOtpSent(true);
         setShowSecondField(true);
         setOtpCooldown(60);
-        setInfoMessage(`OTP sent to ${phone}. Enter the 6-digit code below.`);
+        setInfoMessage(`OTP sent to ${phone}. Enter the code below.`);
       }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Failed to send OTP.';
@@ -198,11 +203,11 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onAuthSuccess }) => {
   const handleVerifyPhoneOtp = async (e: React.FormEvent) => {
     e.preventDefault();
     resetMessages();
-    const phone = normalizePhone(identifier);
-    const cleanOtp = otpCode.trim();
+    const phone = sentToPhone || normalizePhone(identifier);
+    const cleanOtp = otpCode.replace(/\D/g, '');
 
     if (!cleanOtp || cleanOtp.length < 4) {
-      setError('Please enter the OTP sent to your mobile number.');
+      setError('Please enter the complete OTP code received on your mobile.');
       return;
     }
 
@@ -215,7 +220,17 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onAuthSuccess }) => {
       });
 
       if (verifyError) {
-        setError(verifyError.message || 'Invalid or expired OTP. Please try again.');
+        console.warn('[Supabase OTP verify error]', verifyError.message, 'phone:', phone);
+        if (
+          verifyError.message?.toLowerCase().includes('expired') ||
+          verifyError.message?.toLowerCase().includes('invalid')
+        ) {
+          setError(
+            'The OTP code entered is invalid or has expired. Supabase OTPs expire quickly (default 60s). If you tapped "Resend OTP", make sure you are using the newest code from the latest SMS, or tap "Resend OTP" to generate a fresh code.'
+          );
+        } else {
+          setError(verifyError.message || 'Invalid or expired OTP. Please try again.');
+        }
       } else if (data.user) {
         const cloudProf = await fetchUserProfileFromSupabase(data.user.id);
         const userFullName =
@@ -590,7 +605,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onAuthSuccess }) => {
               {/* Refined Second Input: Appears according to user email or phone */}
               <div className={showSecondField ? 'space-y-1 block animate-in fade-in duration-200' : 'hidden'}>
                 <label className="block text-xs font-bold text-slate-800 tracking-wider uppercase mb-1">
-                  PASSWORD/OTP
+                  {isPhone ? 'SMS OTP Code' : 'Password'}
                 </label>
 
                 {isPhone ? (
@@ -604,13 +619,31 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onAuthSuccess }) => {
                         inputMode="numeric"
                         autoComplete="one-time-code"
                         pattern="[0-9]*"
-                        maxLength={6}
-                        placeholder="Enter 6-digit OTP"
+                        maxLength={10}
+                        placeholder="Enter OTP (6 or 8 digits)"
                         value={otpCode}
-                        onChange={(e) => setOtpCode(e.target.value.replace(/[^0-9]/g, ''))}
+                        onChange={(e) => {
+                          const digits = e.target.value.replace(/[^0-9]/g, '').slice(0, 10);
+                          setOtpCode(digits);
+                          if (error) setError(null);
+                        }}
+                        onPaste={(e) => {
+                          e.preventDefault();
+                          const pasted = e.clipboardData.getData('text');
+                          const digits = pasted.replace(/[^0-9]/g, '').slice(0, 10);
+                          if (digits) {
+                            setOtpCode(digits);
+                            if (error) setError(null);
+                          }
+                        }}
                         className="w-full bg-transparent py-2 text-sm font-semibold tracking-widest text-slate-900 placeholder:text-slate-400 focus:outline-none"
                         required={showSecondField && isPhone}
                       />
+                      {otpCode.length > 0 && (
+                        <span className="text-[11px] font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full shrink-0 select-none">
+                          {otpCode.length} digits
+                        </span>
+                      )}
                     </div>
 
                     <div className="flex justify-between items-center pt-2">

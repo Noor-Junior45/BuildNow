@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Routes, Route, useNavigate, useLocation, Navigate } from 'react-router-dom';
 import { Product, CartItem, KolkataArea, SavedAddress, Order, WiringServiceBooking, UserProfile } from './types';
-import { INITIAL_PRODUCTS } from './data/products';
 import { KOLKATA_AREAS } from './data/kolkataAreas';
 import { Header } from './components/Header';
 import { LocationModal } from './components/LocationModal';
@@ -99,9 +98,9 @@ export default function App() {
     }
   });
 
-  // State Management
+  // State Management (Only real data fetched from Supabase)
   const [isAuthLoading, setIsAuthLoading] = useState(true);
-  const [products, setProducts] = useState<Product[]>(INITIAL_PRODUCTS);
+  const [products, setProducts] = useState<Product[]>([]);
   const [currentArea, setCurrentArea] = useState<KolkataArea>(KOLKATA_AREAS[3]); // Default: Salt Lake Sector V
   const [activeSavedAddress, setActiveSavedAddress] = useState<SavedAddress | null>(() => {
     try {
@@ -136,6 +135,29 @@ export default function App() {
     return 'all';
   });
   const [searchQuery, setSearchQuery] = useState('');
+
+  // Synchronize search query with URL query parameter ?q=
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const q = params.get('q');
+    if (q !== null) {
+      setSearchQuery(q);
+    } else if (location.pathname === '/' || location.pathname === '/home') {
+      setSearchQuery('');
+    }
+  }, [location.pathname, location.search]);
+
+  const handleSearchChange = (query: string) => {
+    setSearchQuery(query);
+    if (!query) {
+      const params = new URLSearchParams(location.search);
+      if (params.has('q')) {
+        params.delete('q');
+        const nextQuery = params.toString();
+        navigate(`${location.pathname}${nextQuery ? `?${nextQuery}` : ''}`, { replace: true });
+      }
+    }
+  };
   
   // Cart State - Local Storage Backed for zero loss
   const [cartItems, setCartItems] = useState<CartItem[]>(() => getLocalCartItems());
@@ -1125,7 +1147,8 @@ export default function App() {
           activeAddress={activeSavedAddress}
           onOpenLocationModal={() => setIsLocationModalOpen(true)}
           searchQuery={searchQuery}
-          onSearchChange={setSearchQuery}
+          onSearchChange={handleSearchChange}
+          allProducts={products}
           cartCount={cartCount}
           cartTotal={cartTotal}
           onOpenCart={() => navigate('/cart')}
@@ -1156,7 +1179,7 @@ export default function App() {
                 cartItems={cartItems}
                 onOpenCart={() => navigate('/cart')}
                 searchQuery={searchQuery}
-                onSearchChange={setSearchQuery}
+                onSearchChange={handleSearchChange}
               />
             }
           />
@@ -1209,7 +1232,8 @@ export default function App() {
                 cartItems={cartItems}
                 onOpenCart={() => navigate('/cart')}
                 searchQuery={searchQuery}
-                onSearchChange={setSearchQuery}
+                onSearchChange={handleSearchChange}
+                products={products}
                 onOpenProductQuickView={(prod) => {
                   setSelectedProductQuickView(prod);
                   trackProductView(prod);
@@ -1296,7 +1320,7 @@ export default function App() {
             element={
               <TechniciansPage
                 searchQuery={searchQuery}
-                onSearchChange={setSearchQuery}
+                onSearchChange={handleSearchChange}
               />
             }
           />
@@ -1542,8 +1566,8 @@ export default function App() {
         }}
       />
 
-      {/* Zomato-style Floating Map Route Circle Button for Current Active Order (Navigates directly to dedicated live order page, hidden on profile tab and profile sub-pages) */}
-      {!location.pathname.startsWith('/live-order') && !location.pathname.startsWith('/profile') && (
+      {/* Zomato-style Floating Map Route Circle Button for Current Active Order (Navigates directly to dedicated live order page, hidden on profile tab, cart page, and live-order sub-pages) */}
+      {!location.pathname.startsWith('/live-order') && !location.pathname.startsWith('/profile') && !location.pathname.startsWith('/cart') && activeTab !== 'cart' && (
         <FloatingLiveOrderButton
           order={activeLiveOrder}
           onClick={() => navigate('/live-order')}

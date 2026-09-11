@@ -30,6 +30,7 @@ import { ProductCardImage } from './ProductCardImage';
 import { MaterialCostCalculator } from './MaterialCostCalculator';
 import { hapticLight, hapticSelection } from '../utils/haptics';
 import { PullToRefresh } from './PullToRefresh';
+import { isElectricalProduct, isConstructionProduct } from '../utils/categoryHelper';
 
 export interface HomePageProps {
   onAddToCart: (product: Product) => void;
@@ -450,57 +451,21 @@ export const HomePage: React.FC<HomePageProps> = ({
   }, [liveProducts]);
 
   // -------------------------------------------------------------------------
-  // ROW 4: Newly Launched Electrical Products (Strictly from real backend database)
+  // ROW 4: Newly Launched Electrical Products (Strictly electrical only)
   // -------------------------------------------------------------------------
   const newlyLaunchedElectrical = useMemo(() => {
-    return liveProducts.filter((p) => {
-      const cat = (p.category || '').toLowerCase();
-      const sub = (p.subCategory || '').toLowerCase();
-      const name = (p.name || '').toLowerCase();
-      return (
-        !cat ||
-        cat.includes('electrical') ||
-        cat.includes('wire') ||
-        cat.includes('cable') ||
-        cat.includes('switch') ||
-        cat.includes('fan') ||
-        cat.includes('light') ||
-        cat.includes('pipe') ||
-        cat.includes('conduit') ||
-        cat.includes('pvc') ||
-        sub.includes('pipe') ||
-        sub.includes('conduit') ||
-        sub.includes('pvc') ||
-        sub.includes('mcb') ||
-        sub.includes('light') ||
-        sub.includes('fan') ||
-        name.includes('pipe') ||
-        name.includes('dalda') ||
-        name.includes('conduit')
-      );
-    }).slice(0, 10);
+    return liveProducts
+      .filter((p) => isElectricalProduct(p) && !isConstructionProduct(p))
+      .slice(0, 10);
   }, [liveProducts]);
 
   // -------------------------------------------------------------------------
-  // ROW 5: Newly Launched Construction Products (Strictly from real backend database)
+  // ROW 5: Newly Launched Construction Products (Strictly construction only)
   // -------------------------------------------------------------------------
   const newlyLaunchedConstruction = useMemo(() => {
-    return liveProducts.filter((p) => {
-      const cat = (p.category || '').toLowerCase();
-      const sub = (p.subCategory || '').toLowerCase();
-      return (
-        cat.includes('construction') ||
-        cat.includes('cement') ||
-        cat.includes('plumbing') ||
-        cat.includes('paint') ||
-        cat.includes('hardware') ||
-        cat.includes('building') ||
-        sub.includes('cement') ||
-        sub.includes('tmt') ||
-        sub.includes('pipe') ||
-        sub.includes('waterproof')
-      );
-    }).slice(0, 10);
+    return liveProducts
+      .filter((p) => isConstructionProduct(p) && !isElectricalProduct(p))
+      .slice(0, 10);
   }, [liveProducts]);
 
   // -------------------------------------------------------------------------

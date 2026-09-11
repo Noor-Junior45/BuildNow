@@ -227,8 +227,8 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
     setOtpError('');
 
     const token = enteredOtp.trim();
-    if (token.length < 6) {
-      setOtpError('Please enter the complete 6-digit OTP code.');
+    if (token.length < 4) {
+      setOtpError('Please enter the complete OTP code received on your phone.');
       return;
     }
 
@@ -477,23 +477,32 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
             <form onSubmit={handleVerifyOtpSubmit} className="space-y-3.5">
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1 text-center">
-                  6-Digit OTP Code
+                  OTP Verification Code (6 or 8 digits)
                 </label>
                 <input
                   type="text"
-                  maxLength={6}
+                  maxLength={10}
                   inputMode="numeric"
                   autoComplete="one-time-code"
                   pattern="[0-9]*"
                   autoFocus
                   value={enteredOtp}
                   onChange={(e) => {
-                    const clean = e.target.value.replace(/\D/g, '');
+                    const clean = e.target.value.replace(/\D/g, '').slice(0, 10);
                     setEnteredOtp(clean);
                     setOtpError('');
                   }}
-                  placeholder="• • • • • •"
-                  className="w-full text-center tracking-[0.4em] text-xl font-black px-4 py-2.5 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-amber-400 text-slate-900 bg-white"
+                  onPaste={(e) => {
+                    e.preventDefault();
+                    const text = e.clipboardData.getData('text');
+                    const clean = text.replace(/\D/g, '').slice(0, 10);
+                    if (clean) {
+                      setEnteredOtp(clean);
+                      setOtpError('');
+                    }
+                  }}
+                  placeholder="Enter OTP code"
+                  className="w-full text-center tracking-[0.3em] text-xl font-black px-4 py-2.5 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-amber-400 text-slate-900 bg-white"
                 />
               </div>
 

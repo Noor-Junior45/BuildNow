@@ -1,5 +1,5 @@
 import { Product } from '../types';
-import { INITIAL_PRODUCTS } from '../data/products';
+import { isElectricalProduct, isConstructionProduct } from './categoryHelper';
 
 export interface SearchMatchResult {
   product: Product;
@@ -39,23 +39,35 @@ const ELECTRICAL_KEYWORDS = [
  */
 export function detectQueryCategory(
   query: string,
-  allProducts: Product[] = INITIAL_PRODUCTS
+  allProducts: Product[] = [],
+  currentCategory?: string
 ): 'electrical' | 'construction' {
   const q = query.toLowerCase().trim();
-  if (!q) return 'electrical';
+  if (!q) return currentCategory === 'construction' ? 'construction' : 'electrical';
 
-  // Check matching products
-  const electricalMatches = allProducts.filter(
-    (p) => p.category === 'electrical' && isProductMatch(p, q)
+  // Check matching products from the database
+  const realProducts = allProducts;
+
+  const electricalMatches = realProducts.filter(
+    (p) => isElectricalProduct(p) && !isConstructionProduct(p) && isProductMatch(p, q)
   );
-  const constructionMatches = allProducts.filter(
-    (p) => p.category === 'construction' && isProductMatch(p, q)
+  const constructionMatches = realProducts.filter(
+    (p) => isConstructionProduct(p) && !isElectricalProduct(p) && isProductMatch(p, q)
   );
 
-  if (constructionMatches.length > electricalMatches.length && constructionMatches.length > 0) {
+  // If one has matches and other has none
+  if (constructionMatches.length > 0 && electricalMatches.length === 0) {
     return 'construction';
   }
-  if (electricalMatches.length > constructionMatches.length && electricalMatches.length > 0) {
+  if (electricalMatches.length > 0 && constructionMatches.length === 0) {
+    return 'electrical';
+  }
+
+  // If one has strictly more matches
+  if (constructionMatches.length > electricalMatches.length) {
+    return 'construction';
+  }
+  if (electricalMatches.length > constructionMatches.length) {
     return 'electrical';
   }
 
@@ -75,9 +87,22 @@ export function detectQueryCategory(
     }
   }
 
+  // Add product relevance scores when tied
+  if (constructionMatches.length > 0) {
+    constructionScore += constructionMatches.reduce((acc, p) => acc + calculateRelevanceScore(p, q), 0);
+  }
+  if (electricalMatches.length > 0) {
+    electricalScore += electricalMatches.reduce((acc, p) => acc + calculateRelevanceScore(p, q), 0);
+  }
+
   if (constructionScore > electricalScore) {
     return 'construction';
   }
+  if (electricalScore > constructionScore) {
+    return 'electrical';
+  }
+
+  if (currentCategory === 'construction') return 'construction';
   return 'electrical';
 }
 
@@ -145,7 +170,7 @@ export function calculateRelevanceScore(product: Product, query: string): number
  */
 export function searchAllProducts(
   query: string,
-  allProducts: Product[] = INITIAL_PRODUCTS,
+  allProducts: Product[] = [],
   limit: number = 8
 ): {
   results: Product[];
@@ -163,10 +188,11 @@ export function searchAllProducts(
     };
   }
 
-  const matched = allProducts.filter((p) => isProductMatch(p, q));
+  const realProducts = allProducts;
+  const matched = realProducts.filter((p) => isProductMatch(p, q));
 
-  const electricalCount = matched.filter((p) => p.category === 'electrical').length;
-  const constructionCount = matched.filter((p) => p.category === 'construction').length;
+  const electricalCount = matched.filter((p) => isElectricalProduct(p) && !isConstructionProduct(p)).length;
+  const constructionCount = matched.filter((p) => isConstructionProduct(p) && !isElectricalProduct(p)).length;
 
   const ranked = matched
     .map((product) => ({
