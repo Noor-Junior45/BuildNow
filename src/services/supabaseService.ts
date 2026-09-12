@@ -634,20 +634,76 @@ export async function linkEmailToUser(
   }
 }
 
+let isLoggingOut = false;
+
+export function isUserLoggingOut(): boolean {
+  return isLoggingOut;
+}
+
 /**
  * 4. Sign Out from Supabase
  */
 export async function signOutUser(): Promise<void> {
   try {
+    isLoggingOut = true;
     clearUserProfile();
-    await supabase.auth.signOut();
+    activeUserScope = null;
+
+    // Purge cached profile keys from localStorage immediately so they cannot be restored
+    if (typeof window !== 'undefined') {
+      try {
+        const keysToRemove: string[] = [
+          'giriraj_saved_addresses',
+          'giriraj_active_address',
+          'giriraj_active_landmark',
+          'giriraj_active_user_scope',
+          'giriraj_supabase_auth_session'
+        ];
+        for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i);
+          if (
+            key &&
+            (key.startsWith('giriraj_profile_') ||
+              key.startsWith('giriraj_user_') ||
+              key.startsWith('giriraj_active_addr_') ||
+              key === 'giriraj_active_user_scope' ||
+              key === 'giriraj_supabase_auth_session' ||
+              key === 'giriraj_saved_addresses' ||
+              key === ACTIVE_SAVED_ADDRESS_KEY)
+          ) {
+            keysToRemove.push(key);
+          }
+        }
+        keysToRemove.forEach((k) => safeRemoveItem(k));
+      } catch (e) {
+        console.warn('Error clearing storage on logout:', e);
+      }
+    }
+
+    // Try local sign out first to immediately remove session from memory and client storage
+    try {
+      await supabase.auth.signOut({ scope: 'local' });
+    } catch (e) {
+      console.warn('Local sign out caught:', e);
+    }
+
+    // Then try remote sign out to revoke token on the server
+    try {
+      await supabase.auth.signOut();
+    } catch (e) {
+      console.warn('Global sign out caught:', e);
+    }
   } catch (error) {
     console.error('Supabase sign out error:', error);
   } finally {
     clearUserProfile();
+    activeUserScope = null;
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('giriraj_user_logged_out'));
     }
+    setTimeout(() => {
+      isLoggingOut = false;
+    }, 1200);
   }
 }
 
@@ -694,6 +750,13 @@ export function onAuthStateChange(
   callback: (event: AuthChangeEvent, session: Session | null, user: User | null) => void
 ) {
   const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+    if (isLoggingOut) {
+      clearUserProfile();
+      setActiveUserScope(null);
+      callback('SIGNED_OUT', null, null);
+      return;
+    }
+
     const user = session?.user || null;
 
     if (event === 'SIGNED_OUT' || (!session && !user && event !== 'INITIAL_SESSION')) {
@@ -955,6 +1018,7 @@ export async function fetchUserProfileFromSupabase(userId: string): Promise<User
 
     if (found) {
       const mappedProfile: UserProfile = {
+        id: userId,
         name: cloudName || 'Customer',
         phone: cloudPhone,
         email: cloudEmail,
@@ -1019,8 +1083,15 @@ export async function saveUserProfile(
   },
   userScopeOverride?: string
 ): Promise<{ success: boolean; profile: UserProfile; error?: string }> {
+  let authUserId: string | null = null;
+  try {
+    const { data: authData } = await supabase.auth.getUser();
+    authUserId = authData?.user?.id || null;
+  } catch {}
+
   const scope =
     userScopeOverride ||
+    (authUserId ? `uid_${authUserId}` : null) ||
     activeUserScope ||
     (data.email ? getUserScopeKeyFromUser({ email: data.email }) : null) ||
     (data.phone ? getUserScopeKeyFromUser({ phone: data.phone }) : null);
@@ -1040,6 +1111,7 @@ export async function saveUserProfile(
 
   const updated: UserProfile = {
     ...existing,
+    id: authUserId || existing.id,
     phone: data.phone !== undefined ? data.phone : existing.phone,
     phoneVerified: data.phoneVerified !== undefined ? data.phoneVerified : existing.phoneVerified,
     name: data.name !== undefined ? data.name : existing.name,
@@ -1059,22 +1131,11 @@ export async function saveUserProfile(
     safeSetItem(`giriraj_profile_${scope}`, JSON.stringify(updated));
   }
 
-  // Also save to generic backup if scope wasn't set yet
-  if (data.phone) {
-    const phoneScope = `phone_${data.phone.replace(/\D/g, '')}`;
-    safeSetItem(`giriraj_profile_${phoneScope}`, JSON.stringify(updated));
-  }
-  if (data.email) {
-    const emailScope = `email_${data.email.trim().toLowerCase().replace(/[^a-z0-9]/g, '_')}`;
-    safeSetItem(`giriraj_profile_${emailScope}`, JSON.stringify(updated));
-  }
-
   // Synchronize to Supabase & Backend API
   try {
-    const { data: authData } = await supabase.auth.getUser();
-    if (authData?.user?.id) {
-      broadcastUserProfileUpdate(updated, authData.user.id);
-      const syncResult = await syncUserProfileToSupabase(authData.user.id, {
+    if (authUserId) {
+      broadcastUserProfileUpdate(updated, authUserId);
+      const syncResult = await syncUserProfileToSupabase(authUserId, {
         phone: data.phone,
         full_name: data.name,
         email: data.email,
@@ -1082,11 +1143,8 @@ export async function saveUserProfile(
         dob: data.dob
       });
       return { success: syncResult.success, profile: updated, error: syncResult.error };
-    } else {
-      broadcastUserProfileUpdate(updated);
     }
   } catch (err: any) {
-    broadcastUserProfileUpdate(updated);
     return { success: true, profile: updated };
   }
 
@@ -1105,30 +1163,34 @@ let userProfileRealtimeChannel: ReturnType<typeof supabase.channel> | null = nul
 let userProfileRealtimeChannelUserId: string | null = null;
 
 export function broadcastUserProfileUpdate(profile: Partial<UserProfile>, userId?: string): void {
+  const targetUserId = userId || profile.id;
+  // STRICT: Never broadcast profile updates across tabs without an authoritative target userId
+  if (!targetUserId) return;
+
+  const payload = { ...profile, userId: targetUserId, id: targetUserId };
+
   // 1. Dispatch custom event for current window
   if (typeof window !== 'undefined') {
-    window.dispatchEvent(new CustomEvent('giriraj_profile_updated', { detail: profile }));
+    window.dispatchEvent(new CustomEvent('giriraj_profile_updated', { detail: payload }));
   }
 
   // 2. Broadcast to other tabs on same device/browser
   try {
     if (profileBroadcastChannel) {
-      profileBroadcastChannel.postMessage({ type: 'PROFILE_UPDATED', profile, userId });
+      profileBroadcastChannel.postMessage({ type: 'PROFILE_UPDATED', profile: payload, userId: targetUserId });
     }
   } catch {}
 
   // 3. Broadcast across devices via Supabase Realtime WebSocket channel
-  if (userId) {
-    try {
-      const channelName = `profile_sync_${userId}`;
-      const channel = supabase.channel(channelName);
-      channel.send({
-        type: 'broadcast',
-        event: 'profile_updated',
-        payload: { ...profile, userId }
-      }).catch(() => {});
-    } catch {}
-  }
+  try {
+    const channelName = `profile_sync_${targetUserId}`;
+    const channel = supabase.channel(channelName);
+    channel.send({
+      type: 'broadcast',
+      event: 'profile_updated',
+      payload
+    }).catch(() => {});
+  } catch {}
 }
 
 /**
@@ -1193,7 +1255,7 @@ export function subscribeToUserProfile(
         }
       )
       .on('broadcast', { event: 'profile_updated' }, ({ payload }) => {
-        if (payload) {
+        if (payload && (payload.userId === userId || payload.id === userId)) {
           profileListeners.forEach((cb) => cb(payload));
           fetchUserProfileFromSupabase(userId);
         }
@@ -1201,10 +1263,12 @@ export function subscribeToUserProfile(
       .subscribe();
   }
 
-  // Cross-tab broadcast listener
+  // Cross-tab broadcast listener - strictly verify userId ownership
   const handleCustomEvent = (e: any) => {
-    if (e.detail) {
-      callback(e.detail);
+    if (isLoggingOut) return;
+    const detail = e.detail;
+    if (detail && (detail.id === userId || detail.userId === userId)) {
+      callback(detail);
     }
   };
   if (typeof window !== 'undefined') {
@@ -1212,8 +1276,12 @@ export function subscribeToUserProfile(
   }
 
   const handleBroadcastMsg = (ev: MessageEvent) => {
-    if (ev.data?.type === 'PROFILE_UPDATED' && ev.data?.profile) {
-      callback(ev.data.profile);
+    if (isLoggingOut) return;
+    if (ev.data?.type === 'PROFILE_UPDATED') {
+      const msgUserId = ev.data.userId || ev.data.profile?.userId || ev.data.profile?.id;
+      if (msgUserId && String(msgUserId) === String(userId)) {
+        callback(ev.data.profile);
+      }
     }
   };
   if (profileBroadcastChannel) {
@@ -1273,27 +1341,26 @@ export function doesOrderBelongToUser(
   if (!order || !isRealOrder(order)) return false;
   if (!user || !user.id) return false;
 
-  // 1. Check exact user_id match
-  if (order.user_id && String(order.user_id) === String(user.id)) {
-    return true;
-  }
-  if (order.userId && String(order.userId) === String(user.id)) {
-    return true;
+  const orderUserId = order.user_id || order.userId;
+  // If the order has an explicit user_id assigned, it MUST strictly match user.id
+  if (orderUserId) {
+    return String(orderUserId) === String(user.id);
   }
 
-  // 2. Check exact email match (case-insensitive)
+  // Only for legacy orders created without a user_id:
+  // Check exact email match (case-insensitive)
   const uEmail = (user.email || user.user_metadata?.email || '').trim().toLowerCase();
   const oEmail = (order.customerEmail || order.customer_email || order.recipient_email || order.recipientEmail || '').trim().toLowerCase();
   if (uEmail && oEmail && uEmail.includes('@') && uEmail === oEmail) {
     return true;
   }
 
-  // 3. Check exact 10-digit phone match
+  // Check exact 10-digit phone match (both must be valid 10-digit numbers)
   const rawUPhone = user.phone || user.user_metadata?.phone || '';
   const uPhone = rawUPhone.replace(/\D/g, '').slice(-10);
   const rawOPhone = order.phone || order.recipient_phone || order.recipientPhone || order.customerPhone || '';
   const oPhone = rawOPhone.replace(/\D/g, '').slice(-10);
-  if (uPhone && oPhone && uPhone.length === 10 && uPhone === oPhone) {
+  if (uPhone && oPhone && uPhone.length === 10 && oPhone.length === 10 && uPhone === oPhone) {
     return true;
   }
 
@@ -1947,9 +2014,13 @@ export async function adaptiveInsert(
  */
 export async function createFirestoreOrder(order: Order): Promise<Order> {
   const { data: authData } = await supabase.auth.getUser();
-  const userId = authData?.user?.id || null;
+  const userId = authData?.user?.id || order.userId || (order as any).user_id || null;
+  order.userId = userId;
+  (order as any).user_id = userId;
+
   const scope =
     getUserScopeKeyFromUser(authData?.user) ||
+    activeUserScope ||
     (order.customerEmail ? getUserScopeKeyFromUser({ email: order.customerEmail }) : null) ||
     (order.phone ? getUserScopeKeyFromUser({ phone: order.phone }) : null);
 
@@ -1976,9 +2047,9 @@ export async function createFirestoreOrder(order: Order): Promise<Order> {
   }
 
   // Also persist by specific scoped key if authenticated
-  if (authData?.user?.id) {
-    const uOrders = getStoredOrders(`uid_${authData.user.id}`);
-    safeSetItem(`giriraj_orders_uid_${authData.user.id}`, JSON.stringify([order, ...uOrders.filter((o) => o.id !== order.id)]));
+  if (userId) {
+    const uOrders = getStoredOrders(`uid_${userId}`);
+    safeSetItem(`giriraj_orders_uid_${userId}`, JSON.stringify([order, ...uOrders.filter((o) => o.id !== order.id)]));
   }
 
   // Sound chime alert
@@ -1995,6 +2066,8 @@ export async function createFirestoreOrder(order: Order): Promise<Order> {
       },
       body: JSON.stringify({
         ...order,
+        userId,
+        user_id: userId,
         idempotencyKey
       })
     });
@@ -2541,6 +2614,10 @@ let hasInitiatedInitialAddressFetch = false;
 export function getStoredAddresses(userScopeOverride?: string): SavedAddress[] {
   try {
     const scope = userScopeOverride || activeUserScope;
+    if (!scope) {
+      return [];
+    }
+
     const collected: SavedAddress[] = [];
     const seenIds = new Set<string>();
 
@@ -2554,44 +2631,19 @@ export function getStoredAddresses(userScopeOverride?: string): SavedAddress[] {
       }
     };
 
-    // 1. Check scoped storage if scope is known
-    if (scope) {
-      const raw = localStorage.getItem(`giriraj_addrs_${scope}`);
-      if (raw) {
-        try {
-          addAddresses(JSON.parse(raw));
-        } catch {}
-      }
-    }
-
-    // 2. Check general fallback storage
-    const generalRaw = localStorage.getItem('giriraj_saved_addresses');
-    if (generalRaw) {
+    // 1. Strictly check scoped storage ONLY for the active user
+    const raw = localStorage.getItem(`giriraj_addrs_${scope}`);
+    if (raw) {
       try {
-        addAddresses(JSON.parse(generalRaw));
+        addAddresses(JSON.parse(raw));
       } catch {}
     }
 
-    // 3. Check any other address keys in localStorage
-    if (typeof window !== 'undefined' && window.localStorage) {
-      for (let i = 0; i < localStorage.length; i++) {
-        const k = localStorage.key(i);
-        if (k && k.startsWith('giriraj_addrs_')) {
-          const rawK = localStorage.getItem(k);
-          if (rawK) {
-            try {
-              addAddresses(JSON.parse(rawK));
-            } catch {}
-          }
-        }
-      }
-    }
-
-    // 4. Check active address key as single fallback
-    const activeStored = localStorage.getItem(ACTIVE_SAVED_ADDRESS_KEY);
-    if (activeStored) {
+    // 2. Check scoped active address
+    const scopedActive = localStorage.getItem(`giriraj_active_addr_${scope}`);
+    if (scopedActive) {
       try {
-        const activeObj = JSON.parse(activeStored);
+        const activeObj = JSON.parse(scopedActive);
         if (activeObj && activeObj.id && !seenIds.has(activeObj.id)) {
           seenIds.add(activeObj.id);
           collected.push(activeObj);
@@ -2737,7 +2789,6 @@ export async function fetchUserAddresses(): Promise<SavedAddress[]> {
       if (scope) {
         safeSetItem(`giriraj_addrs_${scope}`, JSON.stringify(list));
       }
-      safeSetItem('giriraj_saved_addresses', JSON.stringify(list));
       
       const activeRaw = safeGetItem(ACTIVE_SAVED_ADDRESS_KEY);
       if (!activeRaw && list.length > 0) {
@@ -2879,7 +2930,6 @@ export async function saveAddressToFirestore(address: SavedAddress): Promise<{ s
     safeSetItem(`giriraj_addrs_${scope}`, JSON.stringify(updated));
     safeSetItem(`giriraj_active_addr_${scope}`, JSON.stringify(address));
   }
-  safeSetItem('giriraj_saved_addresses', JSON.stringify(updated));
   safeSetItem(ACTIVE_SAVED_ADDRESS_KEY, JSON.stringify(address));
   notifyAddressListeners(updated);
   broadcastAddressUpdate(updated, userId || undefined);

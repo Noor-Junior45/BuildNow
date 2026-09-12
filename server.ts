@@ -1193,6 +1193,8 @@ const OrderItemSchema = z.object({
 
 const OrderCheckoutSchema = z.object({
   id: z.string().min(3).max(64),
+  userId: z.string().optional().nullable(),
+  user_id: z.string().optional().nullable(),
   customerName: z.string().min(2, "Customer name must be at least 2 characters").max(100),
   phone: z.string().min(10, "Phone number must contain at least 10 digits").max(20),
   customerEmail: z.string().email("Invalid email format").optional().or(z.literal("")).nullable(),
@@ -2239,6 +2241,7 @@ async function startServer() {
           await sb.from("orders").upsert(
             {
               id: validatedOrder.id,
+              user_id: validatedOrder.userId || validatedOrder.user_id || null,
               customer_name: validatedOrder.customerName,
               recipient_name: validatedOrder.customerName,
               phone: validatedOrder.phone,
@@ -3482,26 +3485,14 @@ async function startServer() {
           matches = true;
         } else if (cleanScope && itemScope && String(itemScope) === cleanScope) {
           matches = true;
-        } else if (cleanPhone && itemPhone && (itemPhone === cleanPhone || cleanPhone.includes(itemPhone) || itemPhone.includes(cleanPhone))) {
+        } else if (cleanPhone && cleanPhone.length === 10 && itemPhone && itemPhone === cleanPhone) {
           matches = true;
-        } else if (cleanEmail && itemEmail && itemEmail === cleanEmail) {
-          matches = true;
-        } else if (!cleanUserId && !cleanScope && !cleanPhone && !cleanEmail) {
-          // If no filters provided, return stored addresses
+        } else if (cleanEmail && cleanEmail.includes("@") && itemEmail && itemEmail === cleanEmail) {
           matches = true;
         }
 
         if (matches && !collectedMap.has(item.id)) {
           collectedMap.set(item.id, item);
-        }
-      }
-
-      // If specific filter yielded 0 results, also supply available server stored addresses
-      if (collectedMap.size === 0 && fileAddresses.length > 0) {
-        for (const item of fileAddresses) {
-          if (item && item.id && !collectedMap.has(item.id)) {
-            collectedMap.set(item.id, item);
-          }
         }
       }
 

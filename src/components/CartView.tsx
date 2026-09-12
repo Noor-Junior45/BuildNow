@@ -178,7 +178,7 @@ export const CartView: React.FC<CartViewProps> = ({
   const confirmedAddressOneLine = useMemo(() => {
     if (effectiveAddress) {
       const parts = [
-        effectiveAddress.receiverName || userProfile?.name || localStorage.getItem('giriraj_user_name') || '',
+        effectiveAddress.receiverName || (userProfile?.name && userProfile.name.toLowerCase() !== 'customer' ? userProfile.name : ''),
         effectiveAddress.houseFlat,
         effectiveAddress.houseName,
         effectiveAddress.buildingRoad,
@@ -187,32 +187,29 @@ export const CartView: React.FC<CartViewProps> = ({
       ].filter(Boolean);
       return parts.join(', ');
     }
-    const localAddr = localStorage.getItem('giriraj_active_address');
-    if (localAddr && localAddr.trim()) {
-      const name = userProfile?.name || localStorage.getItem('giriraj_user_name') || '';
-      return [name, localAddr.trim(), currentArea.name, `PIN ${currentArea.pincode}`].filter(Boolean).join(', ');
-    }
     return `${currentArea.exactStreet || currentArea.name}, Kolkata - ${currentArea.pincode}`;
   }, [effectiveAddress, currentArea, userProfile]);
 
   // Checkout Form Details
   const [customerName, setCustomerName] = useState(() => {
-    return effectiveAddress?.receiverName || userProfile?.name || localStorage.getItem('giriraj_user_name') || '';
+    if (userProfile?.name && userProfile.name.toLowerCase() !== 'customer') return userProfile.name;
+    if (effectiveAddress?.receiverName) return effectiveAddress.receiverName;
+    return '';
   });
   const [phone, setPhone] = useState(() => {
     return userProfile?.phone || userPhone || effectiveAddress?.receiverPhone || '';
   });
   const [email, setEmail] = useState(() => {
-    return userProfile?.email || localStorage.getItem('giriraj_user_email') || '';
+    return userProfile?.email || '';
   });
   const [address, setAddress] = useState(() => {
     if (effectiveAddress) {
       return [effectiveAddress.houseFlat, effectiveAddress.houseName, effectiveAddress.buildingRoad].filter(Boolean).join(', ');
     }
-    return localStorage.getItem('giriraj_active_address') || '';
+    return '';
   });
   const [landmark, setLandmark] = useState(() => {
-    return effectiveAddress?.landmark || localStorage.getItem('giriraj_active_landmark') || '';
+    return effectiveAddress?.landmark || '';
   });
   // Payment method: 'cash' (Cash on Delivery), 'online' (UPI / NetBanking), or 'card' (Debit / Credit Cards)
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'online' | 'card'>('cash');
@@ -570,6 +567,8 @@ export const CartView: React.FC<CartViewProps> = ({
 
     const newOrder: Order = {
       id: orderUuid,
+      userId: userProfile?.id || undefined,
+      user_id: userProfile?.id || undefined,
       trackingNumber: humanOrderNumber,
       customerName: recipientName,
       recipientName,

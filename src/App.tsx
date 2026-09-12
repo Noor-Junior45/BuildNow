@@ -62,7 +62,9 @@ import {
   safeSetItem,
   getUserScopeKeyFromUser,
   setActiveUserScope,
-  getStoredAddresses
+  getStoredAddresses,
+  signOutUser,
+  isUserLoggingOut
 } from './services/supabaseService';
 import { sendLoginNotificationEmail } from './services/securityNotificationService';
 import { useVersionCheck } from './hooks/useVersionCheck';
@@ -219,6 +221,9 @@ export default function App() {
   const [userPhone, setUserPhone] = useState<string | null>(() => getSavedUserProfile()?.phone || null);
   const [userName, setUserName] = useState<string>(() => getSavedUserProfile()?.name || '');
 
+  const activeUserIdRef = useRef<string | null>(null);
+  const isLoggingOutRef = useRef<boolean>(false);
+
   // Initialize stored user profile, auth listener, live orders & saved addresses
   useEffect(() => {
     let unsubscribeOrders: (() => void) | null = null;
@@ -241,8 +246,11 @@ export default function App() {
 
       if (userId) {
         activeUserId = userId;
+        activeUserIdRef.current = userId;
         unsubscribeProfile = subscribeToUserProfile(userId, (freshData) => {
+          if (isLoggingOutRef.current || isUserLoggingOut()) return;
           setUserProfile((prev) => {
+            if (isLoggingOutRef.current || isUserLoggingOut()) return null;
             const updatedPhone = cleanPhoneAutofill(freshData.phone || prev?.phone || '');
             const updated: UserProfile = {
               ...(prev || ({} as UserProfile)),
@@ -283,15 +291,19 @@ export default function App() {
 
     // Fast sync when user returns to the tab or focuses the app
     const syncProfileOnFocus = () => {
-      if (activeUserId && document.visibilityState === 'visible') {
-        fetchUserProfileFromSupabase(activeUserId).then((cloudProf) => {
+      if (isLoggingOutRef.current || isUserLoggingOut()) return;
+      const targetUid = activeUserIdRef.current || activeUserId;
+      if (targetUid && document.visibilityState === 'visible') {
+        fetchUserProfileFromSupabase(targetUid).then((cloudProf) => {
+          if (isLoggingOutRef.current || isUserLoggingOut()) return;
           if (cloudProf) {
             setUserProfile((prev) => {
+              if (isLoggingOutRef.current || isUserLoggingOut()) return null;
               const mergedPhone = cleanPhoneAutofill(cloudProf.phone || prev?.phone || '');
               const merged: UserProfile = {
                 ...(prev || ({} as UserProfile)),
                 ...cloudProf,
-                id: activeUserId!,
+                id: targetUid,
                 name: cloudProf.name || prev?.name || 'Customer',
                 phone: mergedPhone,
                 email: cloudProf.email || prev?.email || '',
@@ -301,7 +313,7 @@ export default function App() {
                 refundBalance: cloudProf.refundBalance ?? prev?.refundBalance ?? 0,
                 cashbackBalance: cloudProf.cashbackBalance ?? prev?.cashbackBalance ?? 0,
               };
-              const scope = getUserScopeKeyFromUser({ id: activeUserId!, email: merged.email, phone: merged.phone });
+              const scope = getUserScopeKeyFromUser({ id: targetUid, email: merged.email, phone: merged.phone });
               if (scope) {
                 safeSetItem(`giriraj_profile_${scope}`, JSON.stringify(merged));
               }
@@ -319,8 +331,10 @@ export default function App() {
 
     // Initial session check
     getInitialAuthSession().then(({ session, user }) => {
+      if (isLoggingOutRef.current || isUserLoggingOut()) return;
       if (user) {
         activeUserId = user.id;
+        activeUserIdRef.current = user.id;
         const scope = getUserScopeKeyFromUser(user);
         if (scope) {
           setActiveUserScope(scope);
@@ -402,8 +416,14 @@ export default function App() {
     });
 
     const unsubAuth = onAuthStateChange((event, session, user) => {
+      if (isLoggingOutRef.current || isUserLoggingOut()) {
+        activeUserId = null;
+        activeUserIdRef.current = null;
+        return;
+      }
       if (user) {
         activeUserId = user.id;
+        activeUserIdRef.current = user.id;
         const scope = getUserScopeKeyFromUser(user);
         if (scope) {
           setActiveUserScope(scope);
@@ -491,6 +511,7 @@ export default function App() {
 
     const handleLogoutEvent = () => {
       activeUserId = null;
+      activeUserIdRef.current = null;
       setUserProfile(null);
       setUserPhone(null);
       setUserName('');
@@ -498,6 +519,7 @@ export default function App() {
       setSavedAddresses(getStoredAddresses());
       setCartItems(getLocalCartItems());
       setupUserSubscriptions();
+      navigate('/login', { replace: true });
     };
     window.addEventListener('giriraj_user_logged_out', handleLogoutEvent);
 
@@ -1079,6 +1101,28 @@ export default function App() {
     navigate('/');
   };
 
+  const handleLogout = async () => {
+    isLoggingOutRef.current = true;
+    activeUserIdRef.current = null;
+    try {
+      setActiveUserScope(null);
+      setUserProfile(null);
+      setUserPhone(null);
+      setUserName('');
+      setOrders([]);
+      setSavedAddresses([]);
+      await signOutUser();
+      navigate('/login', { replace: true });
+    } catch (err) {
+      console.error('Logout error:', err);
+      navigate('/login', { replace: true });
+    } finally {
+      setTimeout(() => {
+        isLoggingOutRef.current = false;
+      }, 1000);
+    }
+  };
+
   // 1. If auth session is still checking on app launch, show brand loading screen
   if (isAuthLoading) {
     return (
@@ -1304,12 +1348,7 @@ export default function App() {
                   setUserPhone(updated.phone || null);
                   setUserName(updated.name || '');
                 }}
-                onLogout={() => {
-                  setUserProfile(null);
-                  setUserPhone(null);
-                  setUserName('');
-                  navigate('/login', { replace: true });
-                }}
+                onLogout={handleLogout}
               />
             }
           />

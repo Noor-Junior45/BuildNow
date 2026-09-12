@@ -124,11 +124,9 @@ export const LocationModal: React.FC<LocationModalProps> = ({
   const [receiverName, setReceiverName] = useState(() => {
     if (activeAddress?.receiverName) return activeAddress.receiverName;
     if (userProfile?.name && userProfile.name.toLowerCase() !== 'customer') return userProfile.name;
-    const emailToUse = userProfile?.email || localStorage.getItem('giriraj_user_email') || '';
+    const emailToUse = userProfile?.email || '';
     const derived = deriveNameFromEmail(emailToUse);
     if (derived) return derived;
-    const stored = localStorage.getItem('giriraj_user_name');
-    if (stored && stored.toLowerCase() !== 'customer') return stored;
     return '';
   });
 

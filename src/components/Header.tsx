@@ -445,15 +445,6 @@ export const Header: React.FC<HeaderProps> = ({
                             <span className="text-xs sm:text-sm font-bold text-slate-900">
                               ₹{product.price}
                             </span>
-                            <span
-                              className={`text-[10px] font-semibold px-1.5 py-0.2 rounded mt-0.5 ${
-                                isConst
-                                  ? 'bg-amber-100 text-amber-800'
-                                  : 'bg-emerald-100 text-emerald-800'
-                              }`}
-                            >
-                              {isConst ? 'Construction' : 'Electrical'}
-                            </span>
                           </div>
                         </button>
                       );

@@ -17,13 +17,13 @@ import {
   Lock,
   Heart,
   RotateCcw,
-  Trash2
+  Trash2,
+  Loader2
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Order, SavedAddress, UserProfile, CartItem, Product, WalletTransaction } from '../types';
 import { OrderHistoryView } from './OrderHistoryView';
 import {
-  signOutUser,
   deleteAddressFromFirestore,
   subscribeToUpiIds,
   fetchProductsFromSupabase,
@@ -58,7 +58,7 @@ interface ProfileViewProps {
   onOpenShop: () => void;
   onOpenServices: () => void;
   onProfileUpdated: (updated: UserProfile) => void;
-  onLogout: () => void;
+  onLogout: () => void | Promise<void>;
   onAddToCart?: (product: Product) => void;
   allProducts?: Product[];
 }
@@ -80,6 +80,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
   allProducts
 }) => {
   const navigate = useNavigate();
+  const [isSigningOut, setIsSigningOut] = useState(false);
 
   // Current active sub-page view: 'main' | 'orders' | 'addresses' | 'payments' | 'wallet' | 'services' | 'membership' | 'help' | 'notifications' | 'privacy' | 'terms' | 'favorites' | 'refund-policy'
   const [subPage, setSubPage] = useState<
@@ -736,14 +737,32 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
         <div className="pt-3">
           <button
             id="btn-profile-signout"
-            onClick={() => {
-              signOutUser();
-              onLogout();
+            type="button"
+            disabled={isSigningOut}
+            onClick={async () => {
+              if (isSigningOut) return;
+              setIsSigningOut(true);
+              try {
+                await onLogout();
+              } catch (err) {
+                console.error('Logout error:', err);
+              } finally {
+                setIsSigningOut(false);
+              }
             }}
-            className="w-full py-3.5 px-6 rounded-full bg-red-600 hover:bg-red-700 active:bg-red-800 text-white transition-all font-medium text-[15px] sm:text-base flex items-center justify-center gap-2.5 cursor-pointer shadow-sm hover:shadow-md active:scale-[0.99]"
+            className="w-full py-3.5 px-6 rounded-full bg-red-600 hover:bg-red-700 active:bg-red-800 disabled:opacity-70 disabled:cursor-not-allowed text-white transition-all font-medium text-[15px] sm:text-base flex items-center justify-center gap-2.5 cursor-pointer shadow-sm hover:shadow-md active:scale-[0.99]"
           >
-            <LogOut className="w-5 h-5 text-white" />
-            <span>Sign Out</span>
+            {isSigningOut ? (
+              <>
+                <Loader2 className="w-5 h-5 animate-spin text-white" />
+                <span>Signing Out...</span>
+              </>
+            ) : (
+              <>
+                <LogOut className="w-5 h-5 text-white" />
+                <span>Sign Out</span>
+              </>
+            )}
           </button>
         </div>
 
