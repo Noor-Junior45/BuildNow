@@ -187,7 +187,7 @@ export const USER_WALLET_BALANCE_KEY = 'giriraj_user_wallet_balance';
 export const USER_REFUND_BALANCE_KEY = 'giriraj_user_refund_balance';
 export const USER_CASHBACK_BALANCE_KEY = 'giriraj_user_cashback_balance';
 export const SAVED_ADDRESSES_STORAGE_KEY = 'giriraj_user_addresses_v4';
-export const ACTIVE_SAVED_ADDRESS_KEY = 'giriraj_active_address_v4';
+export const ACTIVE_SAVED_ADDRESS_KEY = 'giriraj_active_saved_address';
 export const SAVED_UPI_STORAGE_KEY = 'giriraj_user_saved_upi';
 export const ORDERS_STORAGE_KEY = 'giriraj_orders_v2';
 
@@ -208,6 +208,11 @@ export function getUserScopeKeyFromUser(user?: { id?: string; email?: string | n
   if (user.email && user.email.trim()) return `email_${user.email.trim().toLowerCase().replace(/[^a-z0-9]/g, '_')}`;
   if (user.phone && user.phone.trim()) return `phone_${user.phone.replace(/\D/g, '')}`;
   return null;
+}
+
+export function getActiveAddressStorageKey(user?: { id?: string; email?: string | null; phone?: string | null } | string | null): string {
+  const scope = typeof user === 'string' ? user : (getUserScopeKeyFromUser(user) || activeUserScope);
+  return scope ? `${ACTIVE_SAVED_ADDRESS_KEY}_${scope}` : `${ACTIVE_SAVED_ADDRESS_KEY}_guest`;
 }
 
 /**
@@ -233,7 +238,11 @@ export function purgeLegacyUnscopedStorage(): void {
       'giriraj_user_addresses_v4',
       'giriraj_active_address_v4',
       'giriraj_active_address',
+      'giriraj_active_saved_address',
       'giriraj_active_landmark',
+      'giriraj_selected_area',
+      'giriraj_order_ratings',
+      'giriraj_cart_items',
       'giriraj_user_saved_upi',
       'giriraj_orders_v2',
       'giriraj_customer_orders',
@@ -650,28 +659,17 @@ export async function signOutUser(): Promise<void> {
     clearUserProfile();
     activeUserScope = null;
 
-    // Purge cached profile keys from localStorage immediately so they cannot be restored
+    // Purge cached session, profile, address, and user data from localStorage immediately
     if (typeof window !== 'undefined') {
       try {
-        const keysToRemove: string[] = [
-          'giriraj_saved_addresses',
-          'giriraj_active_address',
-          'giriraj_active_landmark',
-          'giriraj_active_user_scope',
-          'giriraj_supabase_auth_session'
-        ];
+        const ALLOWED_LOGOUT_KEYS = new Set<string>([
+          PENDING_SYNC_STORAGE_KEY,
+          'giriraj_legacy_purge_v1_done'
+        ]);
+        const keysToRemove: string[] = [];
         for (let i = 0; i < localStorage.length; i++) {
           const key = localStorage.key(i);
-          if (
-            key &&
-            (key.startsWith('giriraj_profile_') ||
-              key.startsWith('giriraj_user_') ||
-              key.startsWith('giriraj_active_addr_') ||
-              key === 'giriraj_active_user_scope' ||
-              key === 'giriraj_supabase_auth_session' ||
-              key === 'giriraj_saved_addresses' ||
-              key === ACTIVE_SAVED_ADDRESS_KEY)
-          ) {
+          if (key && key.startsWith('giriraj_') && !ALLOWED_LOGOUT_KEYS.has(key)) {
             keysToRemove.push(key);
           }
         }
@@ -2786,8 +2784,10 @@ export async function fetchUserAddresses(): Promise<SavedAddress[]> {
         safeSetItem(`giriraj_addrs_${scope}`, JSON.stringify(list));
       }
       
-      const activeRaw = safeGetItem(ACTIVE_SAVED_ADDRESS_KEY);
+      const activeKey = getActiveAddressStorageKey(scope);
+      const activeRaw = safeGetItem(activeKey) || safeGetItem(ACTIVE_SAVED_ADDRESS_KEY);
       if (!activeRaw && list.length > 0) {
+        safeSetItem(activeKey, JSON.stringify(list[0]));
         safeSetItem(ACTIVE_SAVED_ADDRESS_KEY, JSON.stringify(list[0]));
       }
     }
@@ -2926,6 +2926,8 @@ export async function saveAddressToFirestore(address: SavedAddress): Promise<{ s
     safeSetItem(`giriraj_addrs_${scope}`, JSON.stringify(updated));
     safeSetItem(`giriraj_active_addr_${scope}`, JSON.stringify(address));
   }
+  const activeKey = getActiveAddressStorageKey(scope);
+  safeSetItem(activeKey, JSON.stringify(address));
   safeSetItem(ACTIVE_SAVED_ADDRESS_KEY, JSON.stringify(address));
   notifyAddressListeners(updated);
   broadcastAddressUpdate(updated, userId || undefined);
@@ -3031,15 +3033,18 @@ export async function deleteAddressFromFirestore(id: string): Promise<{ success:
   }
   safeSetItem('giriraj_saved_addresses', JSON.stringify(updated));
 
-  const activeRaw = safeGetItem(ACTIVE_SAVED_ADDRESS_KEY);
+  const activeKey = getActiveAddressStorageKey(scope);
+  const activeRaw = safeGetItem(activeKey) || safeGetItem(ACTIVE_SAVED_ADDRESS_KEY);
   if (activeRaw) {
     try {
       const activeObj = JSON.parse(activeRaw);
       if (activeObj?.id === id) {
         if (updated.length > 0) {
+          safeSetItem(activeKey, JSON.stringify(updated[0]));
           safeSetItem(ACTIVE_SAVED_ADDRESS_KEY, JSON.stringify(updated[0]));
         } else {
-          localStorage.removeItem(ACTIVE_SAVED_ADDRESS_KEY);
+          safeRemoveItem(activeKey);
+          safeRemoveItem(ACTIVE_SAVED_ADDRESS_KEY);
         }
       }
     } catch {}

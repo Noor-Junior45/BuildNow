@@ -4,6 +4,7 @@
  * with timestamp, detected device, and approximate location.
  */
 import { API_BASE_URL } from '../lib/apiBase';
+import { ACTIVE_SAVED_ADDRESS_KEY, getActiveAddressStorageKey, safeGetItem } from './supabaseService';
 
 export interface LoginAlertPayload {
   email: string;
@@ -170,19 +171,13 @@ export async function sendLoginNotificationEmail(payload: LoginAlertPayload): Pr
     let detectedLocation = '';
     if (typeof window !== 'undefined') {
       try {
-        const storedActiveAddr = localStorage.getItem('giriraj_active_address');
+        const storedActiveAddr = safeGetItem(getActiveAddressStorageKey(payload.userId)) || safeGetItem(ACTIVE_SAVED_ADDRESS_KEY);
         if (storedActiveAddr) {
           const parsed = JSON.parse(storedActiveAddr);
-          if (parsed.area || parsed.city) {
-            detectedLocation = [parsed.area, parsed.city || 'Kolkata', 'West Bengal, India'].filter(Boolean).join(', ');
-          }
-        }
-        if (!detectedLocation) {
-          const storedArea = localStorage.getItem('giriraj_selected_area');
-          if (storedArea) {
-            const parsed = JSON.parse(storedArea);
-            if (parsed.name) {
-              detectedLocation = `${parsed.name}, Kolkata, West Bengal, India`;
+          if (parsed && typeof parsed === 'object') {
+            const areaName = typeof parsed.area === 'object' ? parsed.area?.name : parsed.area;
+            if (areaName || parsed.city) {
+              detectedLocation = [areaName, parsed.city || 'Kolkata', 'West Bengal, India'].filter(Boolean).join(', ');
             }
           }
         }

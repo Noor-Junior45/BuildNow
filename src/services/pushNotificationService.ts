@@ -7,6 +7,7 @@ import {
   RegistrationError
 } from '@capacitor/push-notifications';
 import { apiUrl } from '../lib/apiBase';
+import { getActiveUserScope } from './supabaseService';
 
 export interface PushNotificationPayload {
   orderId?: string;
@@ -46,8 +47,8 @@ export async function syncPushTokenWithServer(token: string, userId?: string, us
       body: JSON.stringify({
         token,
         platform,
-        userId: userId || localStorage.getItem('giriraj_active_user_scope') || 'guest',
-        userEmail: userEmail || localStorage.getItem('giriraj_user_email') || null,
+        userId: userId || getActiveUserScope() || 'guest',
+        userEmail: userEmail || null,
         registeredAt: new Date().toISOString(),
       }),
     }).catch((err) => {

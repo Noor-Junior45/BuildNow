@@ -50,6 +50,7 @@ import {
   subscribeToOrders,
   subscribeToAddresses,
   ACTIVE_SAVED_ADDRESS_KEY,
+  getActiveAddressStorageKey,
   onAuthStateChange,
   getInitialAuthSession,
   fetchProductsFromSupabase,
@@ -106,7 +107,7 @@ export default function App() {
   const [currentArea, setCurrentArea] = useState<KolkataArea>(KOLKATA_AREAS[3]); // Default: Salt Lake Sector V
   const [activeSavedAddress, setActiveSavedAddress] = useState<SavedAddress | null>(() => {
     try {
-      const stored = safeGetItem(ACTIVE_SAVED_ADDRESS_KEY);
+      const stored = safeGetItem(getActiveAddressStorageKey()) || safeGetItem(ACTIVE_SAVED_ADDRESS_KEY);
       if (stored) {
         return JSON.parse(stored);
       }
@@ -794,7 +795,7 @@ export default function App() {
       if (dismissed === 'true') return;
       
       // If user already has an active selected address or saved address in storage, do not abruptly popup
-      const activeSaved = localStorage.getItem('giriraj_active_saved_address') || localStorage.getItem('giriraj_active_address');
+      const activeSaved = safeGetItem(getActiveAddressStorageKey()) || safeGetItem(ACTIVE_SAVED_ADDRESS_KEY);
       if (activeSaved) return;
     } catch {}
 

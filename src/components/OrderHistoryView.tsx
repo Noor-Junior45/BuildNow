@@ -28,7 +28,7 @@ import {
 } from 'lucide-react';
 import { Order, UserProfile } from '../types';
 import { getOrderWhatsAppUrl } from '../services/emailService';
-import { deleteFirestoreOrder, clearAllUserOrders, updateOrderStatusInFirestore, saveUserProfile } from '../services/supabaseService';
+import { deleteFirestoreOrder, clearAllUserOrders, updateOrderStatusInFirestore, saveUserProfile, getUserScopeKeyFromUser, getActiveUserScope } from '../services/supabaseService';
 import { supabase } from '../lib/supabaseClient';
 import { initiateRazorpayRefund } from '../services/razorpayService';
 import { OrderTrackingTimeline } from './OrderTrackingTimeline';
@@ -74,15 +74,32 @@ export const OrderHistoryView = ({
     return () => clearInterval(timer);
   }, []);
 
+  const userScope = getUserScopeKeyFromUser(userProfile) || getActiveUserScope();
+  const ratingsStorageKey = userScope ? `giriraj_order_ratings_${userScope}` : 'giriraj_order_ratings_guest';
+
   // Ratings State with LocalStorage Persistence
   const [ratings, setRatings] = useState<Record<string, number>>(() => {
     try {
-      return JSON.parse(localStorage.getItem('giriraj_order_ratings') || '{}');
+      return JSON.parse(localStorage.getItem(ratingsStorageKey) || '{}');
     } catch {
       return {};
     }
   });
   const [hoverRating, setHoverRating] = useState<{ orderId: string; star: number } | null>(null);
+
+  // Re-sync ratings if user profile or scope changes
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem(ratingsStorageKey);
+      if (stored) {
+        setRatings(JSON.parse(stored));
+      } else {
+        setRatings({});
+      }
+    } catch {
+      setRatings({});
+    }
+  }, [ratingsStorageKey]);
 
   const getOrderDisplayNumber = (order: Order): string => {
     if (order.trackingNumber) return order.trackingNumber;
@@ -97,7 +114,7 @@ export const OrderHistoryView = ({
     setRatings((prev) => {
       const next = { ...prev, [orderId]: star };
       try {
-        localStorage.setItem('giriraj_order_ratings', JSON.stringify(next));
+        localStorage.setItem(ratingsStorageKey, JSON.stringify(next));
       } catch (err) {
         console.error('Failed to save rating:', err);
       }

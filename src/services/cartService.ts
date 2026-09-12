@@ -1,6 +1,6 @@
 import { supabase } from '../lib/supabaseClient';
 import { CartItem, Product } from '../types';
-import { getActiveUserScope } from './supabaseService';
+import { getActiveUserScope, getUserScopeKeyFromUser } from './supabaseService';
 
 export interface SavedItemRecord {
   id: string;
@@ -12,18 +12,18 @@ export interface SavedItemRecord {
 const LOCAL_CART_KEY_BASE = 'giriraj_cart_items_v2';
 const LOCAL_SAVED_ITEMS_KEY_BASE = 'giriraj_saved_items_v2';
 
-export function getCartStorageKey(): string {
+export function getCartStorageKey(user?: { id?: string; email?: string | null; phone?: string | null } | null): string {
   try {
-    const scope = getActiveUserScope();
+    const scope = getUserScopeKeyFromUser(user) || getActiveUserScope();
     return scope ? `${LOCAL_CART_KEY_BASE}_${scope}` : `${LOCAL_CART_KEY_BASE}_guest`;
   } catch {
     return `${LOCAL_CART_KEY_BASE}_guest`;
   }
 }
 
-function getSavedItemsKey(): string {
+function getSavedItemsKey(user?: { id?: string; email?: string | null; phone?: string | null } | null): string {
   try {
-    const scope = getActiveUserScope();
+    const scope = getUserScopeKeyFromUser(user) || getActiveUserScope();
     return scope ? `${LOCAL_SAVED_ITEMS_KEY_BASE}_${scope}` : `${LOCAL_SAVED_ITEMS_KEY_BASE}_guest`;
   } catch {
     return `${LOCAL_SAVED_ITEMS_KEY_BASE}_guest`;
@@ -33,17 +33,11 @@ function getSavedItemsKey(): string {
 /**
  * Reads locally persisted cart items from localStorage.
  */
-export function getLocalCartItems(): CartItem[] {
+export function getLocalCartItems(user?: { id?: string; email?: string | null; phone?: string | null } | null): CartItem[] {
   if (typeof window === 'undefined') return [];
   try {
-    const key = getCartStorageKey();
-    let raw = localStorage.getItem(key);
-    if (!raw && key !== `${LOCAL_CART_KEY_BASE}_guest`) {
-      raw = localStorage.getItem(`${LOCAL_CART_KEY_BASE}_guest`);
-    }
-    if (!raw) {
-      raw = localStorage.getItem('giriraj_cart_items');
-    }
+    const key = getCartStorageKey(user);
+    const raw = localStorage.getItem(key);
     if (!raw) return [];
     
     const parsed = JSON.parse(raw);
@@ -69,17 +63,13 @@ export function getLocalCartItems(): CartItem[] {
 /**
  * Saves cart items to localStorage and dispatches a broadcast event.
  */
-export function saveLocalCartItems(items: CartItem[]): void {
+export function saveLocalCartItems(items: CartItem[], user?: { id?: string; email?: string | null; phone?: string | null } | null): void {
   if (typeof window === 'undefined') return;
   try {
-    const key = getCartStorageKey();
+    const key = getCartStorageKey(user);
     const cleanItems = items.filter((i) => i && i.product && i.quantity > 0);
     const serialized = JSON.stringify(cleanItems);
     localStorage.setItem(key, serialized);
-    // Also keep guest key updated if in guest mode
-    if (key.includes('_guest')) {
-      localStorage.setItem('giriraj_cart_items', serialized);
-    }
     window.dispatchEvent(new CustomEvent('giriraj_cart_updated', { detail: { items: cleanItems } }));
   } catch (e) {
     console.warn('Error saving local cart items:', e);

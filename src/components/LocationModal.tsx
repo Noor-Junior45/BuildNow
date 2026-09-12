@@ -32,7 +32,10 @@ import {
   deleteAddressFromFirestore,
   subscribeToAddresses,
   cleanPhoneAutofill,
-  ACTIVE_SAVED_ADDRESS_KEY
+  ACTIVE_SAVED_ADDRESS_KEY,
+  getActiveAddressStorageKey,
+  safeSetItem,
+  safeRemoveItem
 } from '../services/supabaseService';
 import { showToast } from '../utils/toast';
 import {
@@ -217,15 +220,10 @@ export const LocationModal = ({
         } else if (userProfile?.name && userProfile.name.toLowerCase() !== 'customer') {
           setReceiverName(userProfile.name);
         } else {
-          const emailToUse = userProfile?.email || localStorage.getItem('giriraj_user_email') || '';
+          const emailToUse = userProfile?.email || '';
           const derived = deriveNameFromEmail(emailToUse);
           if (derived) {
             setReceiverName(derived);
-          } else {
-            const stored = localStorage.getItem('giriraj_user_name');
-            if (stored && stored.toLowerCase() !== 'customer') {
-              setReceiverName(stored);
-            }
           }
         }
 
@@ -427,8 +425,8 @@ export const LocationModal = ({
     const street = streetToUse || detectedStreet || area.exactStreet || area.name;
 
     try {
-      localStorage.removeItem(ACTIVE_SAVED_ADDRESS_KEY);
-      localStorage.setItem('giriraj_active_address', street);
+      safeRemoveItem(getActiveAddressStorageKey());
+      safeRemoveItem(ACTIVE_SAVED_ADDRESS_KEY);
     } catch (e) {
       console.error(e);
     }
@@ -630,11 +628,8 @@ export const LocationModal = ({
   // Select an existing saved address
   const handleSelectSavedAddress = (saved: SavedAddress) => {
     try {
-      localStorage.setItem(ACTIVE_SAVED_ADDRESS_KEY, JSON.stringify(saved));
-      localStorage.setItem('giriraj_active_address', `${saved.houseFlat}, ${saved.houseName}`);
-      if (saved.landmark) {
-        localStorage.setItem('giriraj_active_landmark', saved.landmark);
-      }
+      safeSetItem(getActiveAddressStorageKey(), JSON.stringify(saved));
+      safeSetItem(ACTIVE_SAVED_ADDRESS_KEY, JSON.stringify(saved));
     } catch (e) {
       console.error(e);
     }
@@ -700,10 +695,8 @@ export const LocationModal = ({
     }
 
     try {
-      localStorage.setItem('giriraj_active_address', `${newAddress.houseFlat}, ${newAddress.houseName}`);
-      if (newAddress.landmark) {
-        localStorage.setItem('giriraj_active_landmark', newAddress.landmark);
-      }
+      safeSetItem(getActiveAddressStorageKey(), JSON.stringify(newAddress));
+      safeSetItem(ACTIVE_SAVED_ADDRESS_KEY, JSON.stringify(newAddress));
     } catch (err) {
       console.error(err);
     }

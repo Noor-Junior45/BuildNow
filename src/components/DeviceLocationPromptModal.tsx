@@ -13,7 +13,7 @@ import {
 } from 'lucide-react';
 import { KolkataArea, SavedAddress } from '../types';
 import { KOLKATA_AREAS } from '../data/kolkataAreas';
-import { ACTIVE_SAVED_ADDRESS_KEY } from '../services/supabaseService';
+import { ACTIVE_SAVED_ADDRESS_KEY, getActiveAddressStorageKey, safeSetItem, safeRemoveItem } from '../services/supabaseService';
 import { useBottomSheetDismiss } from '../hooks/useBottomSheetDismiss';
 import { getResilientCurrentPosition, reverseGeocodeWithFallback } from '../utils/geolocationHelper';
 import { showToast } from '../utils/toast';
@@ -75,8 +75,8 @@ export const DeviceLocationPromptModal = ({
       };
 
       try {
-        localStorage.removeItem(ACTIVE_SAVED_ADDRESS_KEY);
-        localStorage.setItem('giriraj_active_address', street);
+        safeRemoveItem(getActiveAddressStorageKey());
+        safeRemoveItem(ACTIVE_SAVED_ADDRESS_KEY);
       } catch (e) {
         console.error(e);
       }
@@ -102,10 +102,9 @@ export const DeviceLocationPromptModal = ({
 
   const handleSelectDefaultHub = () => {
     const central = KOLKATA_AREAS[0]; // Kasba / Kolkata Central hub
-    const defaultAddress = central.exactStreet || central.name;
     try {
-      localStorage.removeItem(ACTIVE_SAVED_ADDRESS_KEY);
-      localStorage.setItem('giriraj_active_address', defaultAddress);
+      safeRemoveItem(getActiveAddressStorageKey());
+      safeRemoveItem(ACTIVE_SAVED_ADDRESS_KEY);
     } catch (e) {
       console.error(e);
     }
@@ -115,11 +114,8 @@ export const DeviceLocationPromptModal = ({
 
   const handleSelectAddress = (addr: SavedAddress) => {
     try {
-      localStorage.setItem(ACTIVE_SAVED_ADDRESS_KEY, JSON.stringify(addr));
-      localStorage.setItem('giriraj_active_address', `${addr.houseFlat}, ${addr.houseName}`);
-      if (addr.landmark) {
-        localStorage.setItem('giriraj_active_landmark', addr.landmark);
-      }
+      safeSetItem(getActiveAddressStorageKey(), JSON.stringify(addr));
+      safeSetItem(ACTIVE_SAVED_ADDRESS_KEY, JSON.stringify(addr));
     } catch (e) {
       console.error(e);
     }

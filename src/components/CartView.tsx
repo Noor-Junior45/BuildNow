@@ -37,7 +37,7 @@ import {
 } from 'lucide-react';
 import { CartItem, KolkataArea, Order, SavedAddress, Product, UserProfile, FeePolicySettings } from '../types';
 import { SwipeableItem } from './SwipeableItem';
-import { createFirestoreOrder, getStoredAddresses, cleanPhoneAutofill, generateUUID } from '../services/supabaseService';
+import { createFirestoreOrder, getStoredAddresses, cleanPhoneAutofill, generateUUID, ACTIVE_SAVED_ADDRESS_KEY, getActiveAddressStorageKey, safeGetItem } from '../services/supabaseService';
 import { generateSecureOrderNumber } from '../utils/cryptoHelper';
 import { notifyOrderPlaced } from '../services/emailService';
 import { getFeeSettings, calculateOrderFees, DEFAULT_FEE_SETTINGS } from '../services/feeService';
@@ -364,8 +364,8 @@ export const CartView = ({
       (address && address.trim().length >= 3) ||
       (savedAddresses && savedAddresses.length > 0) ||
       getStoredAddresses().length > 0 ||
-      localStorage.getItem('giriraj_active_address') ||
-      localStorage.getItem('giriraj_active_saved_address')
+      safeGetItem(getActiveAddressStorageKey(userProfile)) ||
+      safeGetItem(ACTIVE_SAVED_ADDRESS_KEY)
     );
 
     if (!hasAddress) {
@@ -404,8 +404,8 @@ export const CartView = ({
       (address && address.trim().length >= 3) ||
       (savedAddresses && savedAddresses.length > 0) ||
       getStoredAddresses().length > 0 ||
-      localStorage.getItem('giriraj_active_address') ||
-      localStorage.getItem('giriraj_active_saved_address')
+      safeGetItem(getActiveAddressStorageKey(userProfile)) ||
+      safeGetItem(ACTIVE_SAVED_ADDRESS_KEY)
     );
 
     if (!hasAddress) {
@@ -488,7 +488,19 @@ export const CartView = ({
     const resolvedAddress =
       address.trim() ||
       (effectiveAddress ? [effectiveAddress.houseFlat, effectiveAddress.houseName, effectiveAddress.buildingRoad].filter(Boolean).join(', ') : '') ||
-      localStorage.getItem('giriraj_active_address') ||
+      (() => {
+        const stored = safeGetItem(getActiveAddressStorageKey(userProfile)) || safeGetItem(ACTIVE_SAVED_ADDRESS_KEY);
+        if (stored) {
+          try {
+            const parsed = JSON.parse(stored);
+            if (typeof parsed === 'string') return parsed;
+            return [parsed.houseFlat, parsed.houseName, parsed.buildingRoad].filter(Boolean).join(', ') || parsed.formattedExactAddress || '';
+          } catch {
+            return stored;
+          }
+        }
+        return '';
+      })() ||
       currentArea.name;
     const resolvedPhone =
       phone.trim() ||
@@ -500,7 +512,6 @@ export const CartView = ({
       customerName.trim() ||
       effectiveAddress?.receiverName ||
       userProfile?.name ||
-      localStorage.getItem('giriraj_user_name') ||
       'Customer';
 
     setCheckoutError(null);
