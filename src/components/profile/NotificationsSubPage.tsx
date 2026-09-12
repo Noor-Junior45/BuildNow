@@ -15,7 +15,7 @@ interface NotificationsSubPageProps {
   onContactSupport?: () => void;
 }
 
-export const NotificationsSubPage: React.FC<NotificationsSubPageProps> = ({
+export const NotificationsSubPage = ({
   mobileAlerts,
   whatsappAlerts,
   smsAlerts,
@@ -26,7 +26,7 @@ export const NotificationsSubPage: React.FC<NotificationsSubPageProps> = ({
   onToggleEmailAlerts,
   onBack,
   onContactSupport
-}) => {
+}: NotificationsSubPageProps) => {
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 pb-20">

@@ -8,11 +8,11 @@ interface AddProductModalProps {
   onProductAdded?: (product: any) => void;
 }
 
-export const AddProductModal: React.FC<AddProductModalProps> = ({
+export const AddProductModal = ({
   isOpen,
   onClose,
   onProductAdded,
-}) => {
+}: AddProductModalProps) => {
   const [name, setName] = useState('');
   const [brand, setBrand] = useState('Polycab');
   const [category, setCategory] = useState<'Electrical' | 'Construction' | 'Plumbing' | 'Hardware'>('Electrical');

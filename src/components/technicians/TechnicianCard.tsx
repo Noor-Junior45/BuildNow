@@ -8,10 +8,10 @@ interface TechnicianCardProps {
   onSelect: (technician: Technician) => void;
 }
 
-export const TechnicianCard: React.FC<TechnicianCardProps> = ({
+export const TechnicianCard = ({
   technician,
   onSelect
-}) => {
+}: TechnicianCardProps) => {
   const displayName = (technician.name || '').trim() || 'Technician Specialist';
   const cleanId = technician.id ? technician.id.trim() : 'tech-item';
 

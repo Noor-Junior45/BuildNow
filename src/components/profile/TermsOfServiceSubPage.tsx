@@ -5,6 +5,6 @@ interface TermsOfServiceSubPageProps {
   onBack: () => void;
 }
 
-export const TermsOfServiceSubPage: React.FC<TermsOfServiceSubPageProps> = ({ onBack }) => {
+export const TermsOfServiceSubPage = ({ onBack }: TermsOfServiceSubPageProps) => {
   return <LegalView onBack={onBack} type="terms" />;
 };

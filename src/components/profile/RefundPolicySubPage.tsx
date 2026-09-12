@@ -6,10 +6,10 @@ interface RefundPolicySubPageProps {
   onContactSupport?: () => void;
 }
 
-export const RefundPolicySubPage: React.FC<RefundPolicySubPageProps> = ({
+export const RefundPolicySubPage = ({
   onBack,
   onContactSupport
-}) => {
+}: RefundPolicySubPageProps) => {
   return (
     <RefundPolicy
       onBack={onBack}

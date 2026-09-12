@@ -108,7 +108,7 @@ const SORT_LABELS: Record<SortOption, string> = {
   newest: 'Newest First'
 };
 
-export const ConstructionPage: React.FC<ConstructionPageProps> = ({
+export const ConstructionPage = ({
   onAddToCart,
   onUpdateQuantity,
   cartItems = [],
@@ -117,7 +117,7 @@ export const ConstructionPage: React.FC<ConstructionPageProps> = ({
   searchQuery: propSearchQuery,
   onSearchChange,
   products: initialProducts
-}) => {
+}: ConstructionPageProps) => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
 

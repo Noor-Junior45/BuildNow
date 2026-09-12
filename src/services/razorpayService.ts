@@ -5,6 +5,8 @@
  * and automated direct-to-source cancellation refunds managed by Razorpay.
  */
 
+import { generateSecureToken } from '../utils/cryptoHelper';
+
 export interface RazorpayPaymentResponse {
   razorpay_payment_id: string;
   razorpay_order_id: string;
@@ -334,9 +336,9 @@ function showRazorpaySandboxModal(params: {
   document.getElementById('rzp-simulate-success-btn')?.addEventListener('click', () => {
     cleanup();
     const mockResponse: RazorpayPaymentResponse = {
-      razorpay_payment_id: `pay_test_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+      razorpay_payment_id: generateSecureToken('pay_test', 8),
       razorpay_order_id: params.orderId,
-      razorpay_signature: `sig_test_${Date.now()}`
+      razorpay_signature: generateSecureToken('sig_test', 8)
     };
     params.onApprove(mockResponse);
   });
@@ -422,7 +424,7 @@ export async function launchRazorpayCheckout(
   );
 
   const fallbackOrderId =
-    serverOrder?.orderId || `order_test_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+    serverOrder?.orderId || generateSecureToken('order_test', 8);
 
   return new Promise<RazorpayCheckoutResult>((resolve, reject) => {
     const handleApproved = async (response: RazorpayPaymentResponse) => {

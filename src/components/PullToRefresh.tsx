@@ -13,7 +13,7 @@ export interface PullToRefreshProps {
   completeText?: string;
 }
 
-export const PullToRefresh: React.FC<PullToRefreshProps> = ({
+export const PullToRefresh = ({
   onRefresh,
   children,
   disabled = false,
@@ -22,7 +22,7 @@ export const PullToRefresh: React.FC<PullToRefreshProps> = ({
   releaseText = 'Release to update catalog & orders',
   refreshingText = 'Syncing live catalog & orders...',
   completeText = 'Up to date'
-}) => {
+}: PullToRefreshProps) => {
   const {
     isPulling,
     isRefreshing,

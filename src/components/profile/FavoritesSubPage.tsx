@@ -14,7 +14,7 @@ interface FavoritesSubPageProps {
   onReorder: (items: CartItem[]) => void;
 }
 
-export const FavoritesSubPage: React.FC<FavoritesSubPageProps> = ({
+export const FavoritesSubPage = ({
   favoriteProducts,
   onBack,
   onOpenShop,
@@ -22,7 +22,7 @@ export const FavoritesSubPage: React.FC<FavoritesSubPageProps> = ({
   onToggleFavorite,
   onAddToCart,
   onReorder
-}) => {
+}: FavoritesSubPageProps) => {
   // Mobile Edge Swipe Back Gesture
   useEdgeSwipeBack({
     onBack

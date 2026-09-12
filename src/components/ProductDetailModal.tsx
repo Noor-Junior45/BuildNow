@@ -27,14 +27,14 @@ interface ProductDetailModalProps {
   onOpenAuth?: () => void;
 }
 
-export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
+export const ProductDetailModal = ({
   product,
   onClose,
   quantityInCart,
   onAddToCart,
   onUpdateQuantity,
   onOpenAuth
-}) => {
+}: ProductDetailModalProps) => {
   const [isFav, setIsFav] = useState(() => (product ? isProductFavorite(product.id) : false));
   const [copiedLink, setCopiedLink] = useState(false);
   const [shareToast, setShareToast] = useState<string | null>(null);

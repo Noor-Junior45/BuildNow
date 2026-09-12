@@ -67,7 +67,7 @@ function deriveNameFromEmail(email?: string): string {
     .join(' ');
 }
 
-export const LocationModal: React.FC<LocationModalProps> = ({
+export const LocationModal = ({
   isOpen,
   onClose,
   savedAddresses: externalSavedAddresses,
@@ -77,7 +77,7 @@ export const LocationModal: React.FC<LocationModalProps> = ({
   userProfile,
   userPhone,
   onSelectArea
-}) => {
+}: LocationModalProps) => {
   // Navigation steps: 'search_home' | 'map_pin' | 'details_form'
   const [step, setStep] = useState<'search_home' | 'map_pin' | 'details_form'>('search_home');
   // Source that opened the map: 'add_saved_address' | 'detect_location'

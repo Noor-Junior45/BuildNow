@@ -28,14 +28,14 @@ interface DeviceLocationPromptModalProps {
   onOpenManualSearch: () => void;
 }
 
-export const DeviceLocationPromptModal: React.FC<DeviceLocationPromptModalProps> = ({
+export const DeviceLocationPromptModal = ({
   isOpen,
   onClose,
   savedAddresses,
   activeAddress,
   onSelectArea,
   onOpenManualSearch
-}) => {
+}: DeviceLocationPromptModalProps) => {
   const [gpsLoading, setGpsLoading] = useState(false);
   const [gpsError, setGpsError] = useState<string | null>(null);
 

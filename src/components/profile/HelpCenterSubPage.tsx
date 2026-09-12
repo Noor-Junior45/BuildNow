@@ -8,10 +8,10 @@ interface HelpCenterSubPageProps {
   onBack: () => void;
 }
 
-export const HelpCenterSubPage: React.FC<HelpCenterSubPageProps> = ({
+export const HelpCenterSubPage = ({
   userProfile,
   onBack
-}) => {
+}: HelpCenterSubPageProps) => {
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 pb-20">
       <div className="bg-white border-b border-slate-200 px-4 py-3.5 flex items-center gap-3 shadow-2xs">

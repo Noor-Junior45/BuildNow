@@ -13,7 +13,7 @@ interface SavedAddressesSubPageProps {
   onDeleteAddress: (addressId: string) => void;
 }
 
-export const SavedAddressesSubPage: React.FC<SavedAddressesSubPageProps> = ({
+export const SavedAddressesSubPage = ({
   savedAddresses: initialSavedAddresses,
   displayPhone,
   onBack,
@@ -21,7 +21,7 @@ export const SavedAddressesSubPage: React.FC<SavedAddressesSubPageProps> = ({
   onEditAddress,
   onSelectAddress,
   onDeleteAddress
-}) => {
+}: SavedAddressesSubPageProps) => {
   const [addresses, setAddresses] = useState<SavedAddress[]>(() => {
     if (initialSavedAddresses && initialSavedAddresses.length > 0) {
       return initialSavedAddresses;

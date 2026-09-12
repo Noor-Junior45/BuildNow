@@ -29,12 +29,12 @@ interface AccountDeletionPageProps {
   onBack?: () => void;
 }
 
-export const AccountDeletionPage: React.FC<AccountDeletionPageProps> = ({
+export const AccountDeletionPage = ({
   userProfile,
   orders = [],
   onOpenAuth,
   onBack
-}) => {
+}: AccountDeletionPageProps) => {
   const navigate = useNavigate();
 
   // Form inputs

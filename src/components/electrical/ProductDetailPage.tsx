@@ -58,13 +58,13 @@ interface ProductDetailPageProps {
   onOpenAuth: () => void;
 }
 
-export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
+export const ProductDetailPage = ({
   onAddToCart,
   cartItems = [],
   onOpenCart,
   userProfile,
   onOpenAuth
-}) => {
+}: ProductDetailPageProps) => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
 

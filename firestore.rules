@@ -35,6 +35,18 @@ service cloud.firestore {
       return resource.data;
     }
 
+    function isValidOrder(data) {
+      return data.id is string && data.id.size() <= 128
+        && data.customerName is string && data.customerName.size() <= 100
+        && data.phone is string && data.phone.size() <= 25
+        && data.totalAmount is number && data.totalAmount >= 0;
+    }
+
+    function isValidBooking(data) {
+      return data.customerName is string && data.customerName.size() <= 100
+        && data.phone is string && data.phone.size() <= 25;
+    }
+
     // Connection Health Check
     match /test/{testDoc} {
       allow read: if true;
@@ -43,51 +55,81 @@ service cloud.firestore {
     // Public Product Catalog
     match /products/{productId} {
       allow read: if true;
-      allow write: if true; // Allows initial sync & updates
+      allow write: if isAdmin();
     }
 
     // Customer Quick-Commerce Orders
     match /orders/{orderId} {
-      allow read: if true;
+      // Secure access: only the owner or an admin can read an order
+      allow get: if isOwner(resource.data.userId) || isOwner(resource.data.user_id) || isAdmin();
+      allow list: if isSignedIn() && (
+        resource.data.userId == request.auth.uid || 
+        resource.data.user_id == request.auth.uid || 
+        isAdmin()
+      );
+      // Validated creation with ownership binding
       allow create: if isValidId(orderId)
-        && incoming().id is string
-        && incoming().customerName is string && incoming().customerName.size() <= 100
-        && incoming().phone is string && incoming().phone.size() <= 25
-        && incoming().totalAmount is number && incoming().totalAmount >= 0;
-      allow update: if isValidId(orderId)
-        && (incoming().totalAmount is number);
+        && isValidOrder(incoming())
+        && (!isSignedIn() || incoming().userId == request.auth.uid || incoming().user_id == request.auth.uid);
+      // Non-admins can only cancel/update status of their own order
+      allow update: if isValidId(orderId) && (
+        isAdmin() || (
+          (isOwner(resource.data.userId) || isOwner(resource.data.user_id))
+          && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'cancellationReason', 'notes', 'updatedAt'])
+        )
+      );
       allow delete: if isAdmin();
     }
 
     // Real Estate & Apartment Wiring Service Bookings
     match /services_bookings/{bookingId} {
-      allow read: if true;
+      // Only the booking owner or admin can read
+      allow get: if isOwner(resource.data.userId) || isOwner(resource.data.user_id) || isAdmin();
+      allow list: if isSignedIn() && (
+        resource.data.userId == request.auth.uid || 
+        resource.data.user_id == request.auth.uid || 
+        isAdmin()
+      );
       allow create: if isValidId(bookingId)
-        && incoming().customerName is string && incoming().customerName.size() <= 100
-        && incoming().phone is string && incoming().phone.size() <= 25;
-      allow update: if isValidId(bookingId);
+        && isValidBooking(incoming())
+        && (!isSignedIn() || incoming().userId == request.auth.uid || incoming().user_id == request.auth.uid);
+      allow update: if isValidId(bookingId) && (
+        isAdmin() || (
+          (isOwner(resource.data.userId) || isOwner(resource.data.user_id))
+          && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'notes', 'updatedAt'])
+        )
+      );
       allow delete: if isAdmin();
     }
 
     // User Profile Documents
     match /users/{userId} {
-      allow read: if true;
-      allow create, update: if isValidId(userId);
+      allow get: if isOwner(userId) || isAdmin();
+      allow list: if isAdmin();
+      allow create, update: if (isOwner(userId) || isAdmin()) && isValidId(userId);
       allow delete: if isOwner(userId) || isAdmin();
     }
 
     // Saved Addresses
     match /user_addresses/{addressId} {
-      allow read: if isSignedIn();
-      allow create, update: if isSignedIn()
-        && (incoming().user_id == request.auth.uid || incoming().userId == request.auth.uid || isOwner(incoming().userId));
-      allow delete: if isSignedIn()
+      allow get: if isSignedIn() && (resource.data.userId == request.auth.uid || resource.data.user_id == request.auth.uid || isAdmin());
+      allow list: if isSignedIn() && (resource.data.userId == request.auth.uid || resource.data.user_id == request.auth.uid || isAdmin());
+      allow create: if isSignedIn() && isValidId(addressId)
+        && (incoming().user_id == request.auth.uid || incoming().userId == request.auth.uid);
+      allow update: if isSignedIn() && isValidId(addressId)
+        && (existing().user_id == request.auth.uid || existing().userId == request.auth.uid || isAdmin());
+      allow delete: if isSignedIn() && isValidId(addressId)
         && (existing().user_id == request.auth.uid || existing().userId == request.auth.uid || isAdmin());
     }
 
     // Saved UPI Handles
     match /user_upi/{upiId} {
-      allow read, write: if true;
+      allow get: if isSignedIn() && (resource.data.userId == request.auth.uid || resource.data.user_id == request.auth.uid || isAdmin());
+      allow list: if isSignedIn() && (resource.data.userId == request.auth.uid || resource.data.user_id == request.auth.uid || isAdmin());
+      allow create: if isSignedIn() && isValidId(upiId)
+        && (incoming().user_id == request.auth.uid || incoming().userId == request.auth.uid);
+      allow update, delete: if isSignedIn() && isValidId(upiId)
+        && (existing().user_id == request.auth.uid || existing().userId == request.auth.uid || isAdmin());
     }
   }
 }

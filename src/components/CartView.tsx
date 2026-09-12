@@ -38,6 +38,7 @@ import {
 import { CartItem, KolkataArea, Order, SavedAddress, Product, UserProfile, FeePolicySettings } from '../types';
 import { SwipeableItem } from './SwipeableItem';
 import { createFirestoreOrder, getStoredAddresses, cleanPhoneAutofill, generateUUID } from '../services/supabaseService';
+import { generateSecureOrderNumber } from '../utils/cryptoHelper';
 import { notifyOrderPlaced } from '../services/emailService';
 import { getFeeSettings, calculateOrderFees, DEFAULT_FEE_SETTINGS } from '../services/feeService';
 import { INDIAN_STANDARD_WIRE_COLORS, PIPE_COLOR_OPTIONS, getProductColorOptions } from '../data/wireColors';
@@ -87,7 +88,7 @@ interface CartViewProps {
 }
 
 // Official Payment Badges compliant with NPCI & RBI regulations
-const RazorpayLogoBadge: React.FC = () => (
+const RazorpayLogoBadge = () => (
   <div className="h-7 px-2.5 rounded-lg border border-slate-200 bg-white flex items-center gap-1.5 shadow-2xs select-none">
     <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none">
       <path d="M4 3h16l-7 18H7l4-10H5L4 3z" fill="#0C2340" />
@@ -97,20 +98,20 @@ const RazorpayLogoBadge: React.FC = () => (
   </div>
 );
 
-const NpciVerifiedBadge: React.FC = () => (
+const NpciVerifiedBadge = () => (
   <div className="h-6 px-2 rounded-md bg-emerald-50 border border-emerald-200/80 flex items-center gap-1 select-none">
     <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 stroke-[2.2]" />
     <span className="text-[10px] font-black uppercase tracking-wider text-emerald-700">NPCI Certified</span>
   </div>
 );
 
-const CodBadge: React.FC = () => (
+const CodBadge = () => (
   <div className="w-8 h-8 rounded-lg bg-emerald-50 border border-emerald-200 flex items-center justify-center text-emerald-700 shrink-0 select-none shadow-2xs">
     <Banknote className="w-4.5 h-4.5 text-emerald-700 stroke-[1.8]" />
   </div>
 );
 
-export const CartView: React.FC<CartViewProps> = ({
+export const CartView = ({
   items,
   onUpdateQuantity,
   onUpdateItemColor,
@@ -529,7 +530,7 @@ export const CartView: React.FC<CartViewProps> = ({
     const couponCode = promoCode.trim() ? promoCode.trim().toUpperCase() : null;
 
     const orderUuid = generateUUID();
-    const humanOrderNumber = `GP-${Math.floor(100000 + Math.random() * 900000)}`;
+    const humanOrderNumber = generateSecureOrderNumber();
 
     let paymentId: string | undefined = undefined;
     let razorpayOrderId: string | undefined = undefined;

@@ -8,10 +8,10 @@ interface FloatingLiveOrderButtonProps {
   onClick: () => void;
 }
 
-export const FloatingLiveOrderButton: React.FC<FloatingLiveOrderButtonProps> = ({
+export const FloatingLiveOrderButton = ({
   order,
   onClick
-}) => {
+}: FloatingLiveOrderButtonProps) => {
   const location = useLocation();
 
   // Condition: Only show when order exists, NOT on profile, live-order, or cart pages, and NOT yet delivered or cancelled/failed

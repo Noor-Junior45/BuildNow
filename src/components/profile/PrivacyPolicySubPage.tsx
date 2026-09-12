@@ -5,6 +5,6 @@ interface PrivacyPolicySubPageProps {
   onBack: () => void;
 }
 
-export const PrivacyPolicySubPage: React.FC<PrivacyPolicySubPageProps> = ({ onBack }) => {
+export const PrivacyPolicySubPage = ({ onBack }: PrivacyPolicySubPageProps) => {
   return <LegalView onBack={onBack} type="privacy" />;
 };

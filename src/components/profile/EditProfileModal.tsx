@@ -21,7 +21,7 @@ interface EditProfileModalProps {
   onProfileUpdated: (updated: UserProfile) => void;
 }
 
-export const EditProfileModal: React.FC<EditProfileModalProps> = ({
+export const EditProfileModal = ({
   isOpen,
   userProfile,
   refundBalance,
@@ -29,7 +29,7 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
   totalWalletBalance,
   onClose,
   onProfileUpdated
-}) => {
+}: EditProfileModalProps) => {
   const [editName, setEditName] = useState(userProfile?.name || '');
   const [editEmail, setEditEmail] = useState(userProfile?.email || '');
   const [editPhone, setEditPhone] = useState(userProfile?.phone || '');

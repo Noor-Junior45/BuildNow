@@ -8,11 +8,11 @@ interface OfferBadgeProps {
   className?: string;
 }
 
-export const OfferBadge: React.FC<OfferBadgeProps> = ({
+export const OfferBadge = ({
   offer,
   variant = 'card',
   className = ''
-}) => {
+}: OfferBadgeProps) => {
   const discountLabel = offer.discount_type === 'percentage'
     ? `${offer.discount_value}% OFF`
     : `₹${offer.discount_value} OFF`;

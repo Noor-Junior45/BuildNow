@@ -22,11 +22,11 @@ export interface RefundPolicyProps {
   onContactSupport?: () => void;
 }
 
-export const RefundPolicy: React.FC<RefundPolicyProps> = ({
+export const RefundPolicy = ({
   onBack,
   isEmbedded = false,
   onContactSupport
-}) => {
+}: RefundPolicyProps) => {
   return (
     <div
       id="refund-policy-container"

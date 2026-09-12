@@ -11,7 +11,11 @@ interface FooterProps {
   onOpenInstallApp?: () => void;
 }
 
-export const Footer: React.FC<FooterProps> = () => {
+export const Footer = ({
+  onOpenPrivacy,
+  onOpenTerms,
+  onOpenInstallApp
+}: FooterProps = {}) => {
   return (
     <footer className="bg-slate-900 text-slate-300 text-xs mt-8 relative border-t-4 border-[#00875a] font-sans shadow-md" id="main-footer">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 pt-10 pb-28 sm:pb-12">

@@ -11,7 +11,7 @@ interface ProductCardImageProps {
   enableHoverRotate?: boolean;
 }
 
-export const ProductCardImage: React.FC<ProductCardImageProps> = ({
+export const ProductCardImage = ({
   images = [],
   imageUrl,
   alt,
@@ -19,7 +19,7 @@ export const ProductCardImage: React.FC<ProductCardImageProps> = ({
   containerClassName = '',
   autoRotateInterval = 3200,
   enableHoverRotate = true
-}) => {
+}: ProductCardImageProps) => {
   // Collect all valid unique images
   const allImages = React.useMemo(() => {
     const list: string[] = [];

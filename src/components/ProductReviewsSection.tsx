@@ -11,12 +11,12 @@ interface ProductReviewsSectionProps {
   className?: string;
 }
 
-export const ProductReviewsSection: React.FC<ProductReviewsSectionProps> = ({
+export const ProductReviewsSection = ({
   productId,
   productName,
   onOpenAuth,
   className = ''
-}) => {
+}: ProductReviewsSectionProps) => {
   const [reviews, setReviews] = useState<ProductReview[]>([]);
   const [loading, setLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);

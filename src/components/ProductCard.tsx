@@ -18,13 +18,13 @@ interface ProductCardProps {
   onOpenQuickView: (product: Product) => void;
 }
 
-export const ProductCard: React.FC<ProductCardProps> = ({
+export const ProductCard = ({
   product,
   quantityInCart,
   onAddToCart,
   onUpdateQuantity,
   onOpenQuickView
-}) => {
+}: ProductCardProps) => {
   const [isHovered, setIsHovered] = useState(false);
   const [isFav, setIsFav] = useState(() => isProductFavorite(product.id));
   const isWire = isWireProduct(product);

@@ -5,6 +5,7 @@ import { Order, OrderStatus, WiringServiceBooking, SavedAddress, UserProfile, Pr
 import { soundService } from './sound';
 import { showToast } from '../utils/toast';
 import { API_BASE_URL } from '../lib/apiBase';
+import { generateUUID as secureGenerateUUID, generateSecureOrderNumber, generateSecureToken } from '../utils/cryptoHelper';
 
 // Offline Sync Queue Types & Constants
 export interface PendingSyncItem {
@@ -40,7 +41,7 @@ export function enqueuePendingSync(item: Omit<PendingSyncItem, 'id' | 'timestamp
   const queue = getPendingSyncQueue();
   const newItem: PendingSyncItem = {
     ...item,
-    id: `sync_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
+    id: generateSecureToken('sync', 8),
     timestamp: Date.now()
   };
   // Avoid duplicate queue entries for the same entity
@@ -424,13 +425,13 @@ export async function signInWithGoogle(): Promise<{ error: Error | null; url?: s
     if (data?.url) {
       if (isIframe) {
         // In an iframe preview (like AI Studio canvas), open in a new window to bypass iframe 403 security blocks
-        const authWindow = window.open(data.url, '_blank');
+        const authWindow = window.open(data.url, '_blank', 'noopener,noreferrer');
         if (!authWindow) {
           window.location.href = data.url;
         }
       } else if (isNative) {
         // In native Android WebView, open in external device browser (Chrome) for Google OAuth compliance
-        window.open(data.url, '_system');
+        window.open(data.url, '_system', 'noopener,noreferrer');
       }
     }
 
@@ -1933,14 +1934,7 @@ export function isValidUUID(str?: string | null): boolean {
 }
 
 export function generateUUID(): string {
-  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
-    return crypto.randomUUID();
-  }
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
-    const r = (Math.random() * 16) | 0;
-    const v = c === 'x' ? r : (r & 0x3) | 0x8;
-    return v.toString(16);
-  });
+  return secureGenerateUUID();
 }
 
 /**
@@ -2026,7 +2020,7 @@ export async function createFirestoreOrder(order: Order): Promise<Order> {
 
   // Guarantee order has a valid UUID primary key for Supabase UUID columns
   const orderDbId = isValidUUID(order.id) ? order.id : generateUUID();
-  const humanReadableNumber = order.id && order.id.startsWith('GP-') ? order.id : `GP-${Math.floor(100000 + Math.random() * 900000)}`;
+  const humanReadableNumber = order.id && order.id.startsWith('GP-') ? order.id : generateSecureOrderNumber();
   
   order.id = orderDbId;
   if (!order.trackingNumber) {
@@ -2211,20 +2205,22 @@ export async function createFirestoreOrder(order: Order): Promise<Order> {
     console.debug('Deliveries table auto-init notice:', deliveryInitErr);
   }
 
-  // Secure stock decrement via PostgreSQL function
+  // Secure concurrent stock decrement via PostgreSQL function (fixes N+1 sequential loop)
   if (Array.isArray(order.items) && order.items.length > 0) {
-    for (const item of order.items) {
-      if (!item?.product?.id) continue;
-      try {
-        await supabase.rpc('decrement_stock', {
-          p_product_id: String(item.product.id),
-          p_quantity: item.quantity || 1,
-          p_order_id: String(savedOrderId)
-        });
-      } catch (stockErr) {
-        console.warn(`Stock decrement note for ${item.product.id}:`, stockErr);
-      }
-    }
+    const validItems = order.items.filter((item) => item?.product?.id);
+    await Promise.allSettled(
+      validItems.map(async (item) => {
+        try {
+          await supabase.rpc('decrement_stock', {
+            p_product_id: String(item.product.id),
+            p_quantity: item.quantity || 1,
+            p_order_id: String(savedOrderId)
+          });
+        } catch (stockErr) {
+          console.warn(`Stock decrement note for ${item.product.id}:`, stockErr);
+        }
+      })
+    );
   }
 
   const finalSavedOrder: Order = {
@@ -3340,22 +3336,25 @@ export async function updateOrMigrateDaldaPipeInSupabase(): Promise<{ success: b
     let updatedCount = 0;
 
     if (dadaProducts && dadaProducts.length > 0) {
-      for (const p of dadaProducts) {
-        await supabase
-          .from('products')
-          .update({
-            name: newName,
-            brand: 'Dalda',
-            image: newImage,
-            image_urls: [newImage],
-            sub_category: 'Pipes',
-            subcategory: 'Pipes',
-            specs: newSpecs,
-            specifications: newSpecs,
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', p.id);
-        updatedCount++;
+      // Batch update all matching product records in a single query (fixes N+1 sequential loop)
+      const matchedIds = dadaProducts.map((p) => p.id);
+      const { error: batchUpdateErr } = await supabase
+        .from('products')
+        .update({
+          name: newName,
+          brand: 'Dalda',
+          image: newImage,
+          image_urls: [newImage],
+          sub_category: 'Pipes',
+          subcategory: 'Pipes',
+          specs: newSpecs,
+          specifications: newSpecs,
+          updated_at: new Date().toISOString()
+        })
+        .in('id', matchedIds);
+
+      if (!batchUpdateErr) {
+        updatedCount = matchedIds.length;
       }
     }
 

@@ -11,14 +11,14 @@ interface ZoomableImageProps {
   onSwipeRight?: () => void;
 }
 
-export const ZoomableImage: React.FC<ZoomableImageProps> = ({
+export const ZoomableImage = ({
   src,
   alt,
   className = '',
   containerClassName = '',
   onSwipeLeft,
   onSwipeRight
-}) => {
+}: ZoomableImageProps) => {
   const [scale, setScale] = useState(1);
   const [position, setPosition] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);

@@ -55,7 +55,7 @@ function getHeaderDisplayLocation(currentArea: KolkataArea | null, activeAddress
   };
 }
 
-export const Header: React.FC<HeaderProps> = ({
+export const Header = ({
   currentArea,
   activeAddress,
   onOpenLocationModal,
@@ -75,7 +75,7 @@ export const Header: React.FC<HeaderProps> = ({
   activeCategory,
   onSelectCategory,
   onOpenInstallApp
-}) => {
+}: HeaderProps) => {
   const [imgError, setImgError] = useState(false);
   const [isMobileSearchOpen, setIsMobileSearchOpen] = useState(false);
   const [isSearchFocused, setIsSearchFocused] = useState(false);

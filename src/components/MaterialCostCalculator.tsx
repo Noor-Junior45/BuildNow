@@ -60,11 +60,11 @@ interface AIResponseData {
   engineeringAdvice?: string[];
 }
 
-export const MaterialCostCalculator: React.FC<MaterialCostCalculatorProps> = ({
+export const MaterialCostCalculator = ({
   products,
   onAddToCart,
   currentArea
-}) => {
+}: MaterialCostCalculatorProps) => {
   // ---------------------------------------------------------------------------
   // 1. Primary User Selections
   // ---------------------------------------------------------------------------

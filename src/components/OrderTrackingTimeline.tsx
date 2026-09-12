@@ -21,12 +21,12 @@ interface OrderTrackingTimelineProps {
   borderless?: boolean;
 }
 
-export const OrderTrackingTimeline: React.FC<OrderTrackingTimelineProps> = ({
+export const OrderTrackingTimeline = ({
   order,
   className = '',
   compact = false,
   borderless = false
-}) => {
+}: OrderTrackingTimelineProps) => {
   const rawStatus = (order.status || 'pending').toLowerCase();
   const deliveryStatus = (order.delivery?.status || '').toLowerCase();
   const isCancelled = rawStatus === 'cancelled';

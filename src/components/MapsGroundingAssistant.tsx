@@ -16,11 +16,11 @@ interface MapsGroundingAssistantProps {
   currentArea: KolkataArea;
 }
 
-export const MapsGroundingAssistant: React.FC<MapsGroundingAssistantProps> = ({
+export const MapsGroundingAssistant = ({
   isOpen,
   onClose,
   currentArea
-}) => {
+}: MapsGroundingAssistantProps) => {
   const [messages, setMessages] = useState<Message[]>([
     {
       role: 'assistant',

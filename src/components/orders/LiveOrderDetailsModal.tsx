@@ -9,11 +9,11 @@ interface LiveOrderDetailsModalProps {
   onClose: () => void;
 }
 
-export const LiveOrderDetailsModal: React.FC<LiveOrderDetailsModalProps> = ({
+export const LiveOrderDetailsModal = ({
   isOpen,
   order,
   onClose
-}) => {
+}: LiveOrderDetailsModalProps) => {
   const navigate = useNavigate();
 
   useEffect(() => {

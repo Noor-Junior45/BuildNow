@@ -1,3 +1,5 @@
+import { generateSecureToken } from './cryptoHelper';
+
 export type ToastType = 'success' | 'error' | 'warning' | 'info';
 
 export interface ToastMessage {
@@ -9,7 +11,7 @@ export interface ToastMessage {
 
 export function showToast(message: string, type: ToastType = 'info', duration = 3500): void {
   if (typeof window === 'undefined') return;
-  const id = `toast_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
+  const id = generateSecureToken('toast', 6);
   const event = new CustomEvent<ToastMessage>('giriraj_show_toast', {
     detail: { id, message, type, duration }
   });

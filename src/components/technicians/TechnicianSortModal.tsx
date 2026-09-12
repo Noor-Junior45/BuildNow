@@ -17,12 +17,12 @@ interface TechnicianSortModalProps {
   onSelectSort: (sort: TechnicianSortOption) => void;
 }
 
-export const TechnicianSortModal: React.FC<TechnicianSortModalProps> = ({
+export const TechnicianSortModal = ({
   isOpen,
   onClose,
   selectedSort,
   onSelectSort
-}) => {
+}: TechnicianSortModalProps) => {
   if (!isOpen) return null;
 
   // Simple, clean price & ranking options without descriptions or icons

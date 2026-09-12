@@ -9,11 +9,11 @@ interface CategorySearchBarProps {
   placeholder?: string;
 }
 
-export const CategorySearchBar: React.FC<CategorySearchBarProps> = ({
+export const CategorySearchBar = ({
   searchQuery,
   onSearchChange,
   placeholder = 'Search products & equipment...'
-}) => {
+}: CategorySearchBarProps) => {
   const navigate = useNavigate();
 
   const handleClear = () => {

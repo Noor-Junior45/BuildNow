@@ -63,7 +63,7 @@ interface ProfileViewProps {
   allProducts?: Product[];
 }
 
-export const ProfileView: React.FC<ProfileViewProps> = ({
+export const ProfileView = ({
   userProfile,
   orders,
   savedAddresses,
@@ -78,7 +78,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
   onLogout,
   onAddToCart,
   allProducts
-}) => {
+}: ProfileViewProps) => {
   const navigate = useNavigate();
   const [isSigningOut, setIsSigningOut] = useState(false);
 

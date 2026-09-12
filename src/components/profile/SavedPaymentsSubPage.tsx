@@ -16,10 +16,10 @@ interface SavedPaymentsSubPageProps {
   onBack: () => void;
 }
 
-export const SavedPaymentsSubPage: React.FC<SavedPaymentsSubPageProps> = ({
+export const SavedPaymentsSubPage = ({
   savedUpi,
   onBack
-}) => {
+}: SavedPaymentsSubPageProps) => {
   const [newUpiId, setNewUpiId] = useState('');
   const [showAddUpi, setShowAddUpi] = useState(false);
   const [isSavingUpi, setIsSavingUpi] = useState(false);

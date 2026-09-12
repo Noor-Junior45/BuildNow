@@ -32,11 +32,11 @@ interface InstallAppModalProps {
   onInstalledSuccess?: () => void;
 }
 
-export const InstallAppModal: React.FC<InstallAppModalProps> = ({
+export const InstallAppModal = ({
   isOpen,
   onClose,
   onInstalledSuccess
-}) => {
+}: InstallAppModalProps) => {
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [isIOS, setIsIOS] = useState(false);
   const [isStandalone, setIsStandalone] = useState(false);

@@ -23,14 +23,14 @@ interface TechnicianFiltersModalProps {
   totalResultsCount: number;
 }
 
-export const TechnicianFiltersModal: React.FC<TechnicianFiltersModalProps> = ({
+export const TechnicianFiltersModal = ({
   isOpen,
   onClose,
   filters,
   onApplyFilters,
   onResetFilters,
   totalResultsCount
-}) => {
+}: TechnicianFiltersModalProps) => {
   const [draft, setDraft] = useState<TechnicianFilterState>(filters);
 
   useEffect(() => {

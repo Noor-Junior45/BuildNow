@@ -340,7 +340,7 @@ const PARTNER_BRANDS = [
   { name: 'Supreme', segment: 'Plumbing & Drainage', badge: 'Heavy Duty' }
 ];
 
-export const HomePage: React.FC<HomePageProps> = ({
+export const HomePage = ({
   onAddToCart,
   onUpdateQuantity,
   cartItems = [],
@@ -349,7 +349,7 @@ export const HomePage: React.FC<HomePageProps> = ({
   onOpenProductQuickView,
   products,
   onRefresh
-}) => {
+}: HomePageProps) => {
   const navigate = useNavigate();
   const [activePosterIndex, setActivePosterIndex] = useState(0);
   const [dbProducts, setDbProducts] = useState<Product[]>([]);
@@ -1120,7 +1120,8 @@ export const HomePage: React.FC<HomePageProps> = ({
                   } else {
                     window.open(
                       'https://wa.me/918777400280?text=Hi%20SmartRun%20/%20Giriraj%20Power,%20I%20would%20like%20to%20request%20a%20project%20wholesale%20quote.',
-                      '_blank'
+                      '_blank',
+                      'noopener,noreferrer'
                     );
                   }
                 }}

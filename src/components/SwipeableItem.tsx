@@ -10,13 +10,13 @@ interface SwipeableItemProps {
   disabled?: boolean;
 }
 
-export const SwipeableItem: React.FC<SwipeableItemProps> = ({
+export const SwipeableItem = ({
   children,
   onDelete,
   deleteLabel = 'Remove',
   className = '',
   disabled = false
-}) => {
+}: SwipeableItemProps) => {
   const [offsetX, setOffsetX] = useState(0);
   const [isSwiping, setIsSwiping] = useState(false);
   const startX = useRef(0);

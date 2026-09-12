@@ -10,10 +10,10 @@ interface FloatingBottomNavProps {
 }
 
 // Person Logo Component based strictly on user's reference logo (1.jpeg)
-const PersonNavIcon: React.FC<{ isActive: boolean; className?: string }> = ({
+const PersonNavIcon = ({
   isActive,
   className = 'w-5 h-5 sm:w-5.5 sm:h-5.5 mb-0.5'
-}) => {
+}: { isActive: boolean; className?: string }) => {
   if (isActive) {
     return (
       <svg
@@ -46,12 +46,12 @@ const PersonNavIcon: React.FC<{ isActive: boolean; className?: string }> = ({
   );
 };
 
-export const FloatingBottomNav: React.FC<FloatingBottomNavProps> = ({
+export const FloatingBottomNav = ({
   activeTab,
   activeCategory,
   onTabChange,
   onSelectCategory,
-}) => {
+}: FloatingBottomNavProps) => {
   const isHomeActive = activeTab === 'home' || (activeTab === 'catalog' && activeCategory === 'all');
   const isElectricalActive = activeTab === 'electrical' || (activeTab === 'catalog' && activeCategory === 'electrical');
   const isConstructionActive = activeTab === 'construction' || (activeTab === 'catalog' && activeCategory === 'construction');

@@ -60,14 +60,14 @@ const SORT_LABELS: Record<SortOption, string> = {
   newest: 'Newest First'
 };
 
-export const ElectricalListingPage: React.FC<ElectricalListingPageProps> = ({
+export const ElectricalListingPage = ({
   onAddToCart,
   onUpdateQuantity,
   cartItems = [],
   onOpenCart,
   searchQuery: propSearchQuery,
   onSearchChange
-}) => {
+}: ElectricalListingPageProps) => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
 

@@ -92,18 +92,22 @@ export function prewarmImageCache(imageUrls: string[]) {
     caches
       .open('smartrun-images-v2.3.0')
       .then(async (cache) => {
-        for (const url of validUrls.slice(0, 20)) {
-          const isCached = await cache.match(url);
-          if (!isCached) {
-            fetch(url, { mode: 'no-cors', priority: 'low' as any })
-              .then((res) => {
+        const urlsToPrewarm = validUrls.slice(0, 20);
+        await Promise.allSettled(
+          urlsToPrewarm.map(async (url) => {
+            try {
+              const isCached = await cache.match(url);
+              if (!isCached) {
+                const res = await fetch(url, { mode: 'no-cors', priority: 'low' as any });
                 if (res && (res.status === 200 || res.type === 'opaque')) {
-                  cache.put(url, res);
+                  await cache.put(url, res);
                 }
-              })
-              .catch(() => {});
-          }
-        }
+              }
+            } catch {
+              // Ignore background prewarm errors gracefully
+            }
+          })
+        );
       })
       .catch(() => {});
   };

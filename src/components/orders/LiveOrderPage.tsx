@@ -40,11 +40,11 @@ interface LiveOrderPageProps {
   onBack?: () => void;
 }
 
-export const LiveOrderPage: React.FC<LiveOrderPageProps> = ({
+export const LiveOrderPage = ({
   order: propOrder,
   orders = [],
   onBack
-}) => {
+}: LiveOrderPageProps) => {
   const navigate = useNavigate();
   const { orderId } = useParams<{ orderId?: string }>();
 

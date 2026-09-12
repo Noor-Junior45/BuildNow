@@ -23,7 +23,7 @@ interface LegalViewProps {
   type: LegalPageType;
 }
 
-export const LegalView: React.FC<LegalViewProps> = ({ onBack, type }) => {
+export const LegalView = ({ onBack, type }: LegalViewProps) => {
   const effectiveDate = 'August 28, 2026';
 
   // Always reset scroll to top when legal view opens or changes type

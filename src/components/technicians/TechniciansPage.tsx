@@ -27,11 +27,11 @@ const INITIAL_FILTERS: TechnicianFilterState = {
   minRating: undefined
 };
 
-export const TechniciansPage: React.FC<TechniciansPageProps> = ({
+export const TechniciansPage = ({
   searchQuery: propSearchQuery = '',
   onSearchChange,
   onSelectTechnician
-}) => {
+}: TechniciansPageProps) => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const urlQuery = searchParams.get('q') || '';

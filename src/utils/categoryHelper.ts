@@ -167,13 +167,13 @@ const ELECTRICAL_BRANDS = [
  * Checks if a product or raw database row belongs to Construction.
  */
 export function isConstructionProduct(item: any): boolean {
-  if (!item) return false;
+  if (!item || typeof item !== 'object') return false;
 
   const id = String(item.id || '').trim();
-  const cat = (item.category || '').toLowerCase().trim();
-  const sub = (item.subcategory || item.subCategory || item.sub_category || '').toLowerCase().trim();
-  const name = (item.name || '').toLowerCase().trim();
-  const brand = (item.brand || '').toLowerCase().trim();
+  const cat = String(item.category || '').toLowerCase().trim();
+  const sub = String(item.subcategory || item.subCategory || item.sub_category || '').toLowerCase().trim();
+  const name = String(item.name || '').toLowerCase().trim();
+  const brand = String(item.brand || '').toLowerCase().trim();
 
   // Known construction ID pattern
   if (id.startsWith('c') && !id.startsWith('cctv') && (id.startsWith('c-') || id === 'c1' || id === 'c2' || id === 'c3' || id === 'c4' || id === 'c5' || id === 'c6')) {
@@ -209,52 +209,58 @@ export function isConstructionProduct(item: any): boolean {
   }
 
   // Check construction subcategories
-  for (const s of CONSTRUCTION_SUBCATS) {
-    if (sub.includes(s) || s.includes(sub)) {
-      return true;
+  if (sub) {
+    for (const s of CONSTRUCTION_SUBCATS) {
+      if (sub.includes(s) || (sub.length >= 3 && s.includes(sub))) {
+        return true;
+      }
     }
   }
 
   // Check construction brands (if not electrical)
-  for (const b of CONSTRUCTION_BRANDS) {
-    if (brand.includes(b)) {
-      return true;
+  if (brand) {
+    for (const b of CONSTRUCTION_BRANDS) {
+      if (brand.includes(b) || (brand.length >= 3 && b.includes(brand))) {
+        return true;
+      }
     }
   }
 
   // Check specific construction terms in product name
-  if (
-    name.includes('cement') ||
-    name.includes('tmt rebar') ||
-    name.includes('superlinks') ||
-    name.includes('tile adhesive') ||
-    name.includes('cera clean') ||
-    name.includes('wall putty') ||
-    name.includes('exterior emulsion') ||
-    name.includes('interior emulsion') ||
-    name.includes('waterproofing compound') ||
-    name.includes('dampguard') ||
-    name.includes('bwp plywood') ||
-    name.includes('hdhmr board') ||
-    name.includes('wood adhesive') ||
-    name.includes('kitchen sink') ||
-    name.includes('swan neck') ||
-    name.includes('western commode') ||
-    name.includes('concealed cistern') ||
-    name.includes('auto hinges') ||
-    name.includes('drawer channels') ||
-    name.includes('spice rack') ||
-    name.includes('bed lift mechanism') ||
-    name.includes('digital door lock') ||
-    name.includes('padlock') ||
-    name.includes('cpvc pro') ||
-    name.includes('water storage tank') ||
-    name.includes('impact drill') ||
-    name.includes('angle grinder') ||
-    name.includes('step ladder') ||
-    name.includes('tarpaulin sheet')
-  ) {
-    return true;
+  if (name) {
+    if (
+      name.includes('cement') ||
+      name.includes('tmt rebar') ||
+      name.includes('superlinks') ||
+      name.includes('tile adhesive') ||
+      name.includes('cera clean') ||
+      name.includes('wall putty') ||
+      name.includes('exterior emulsion') ||
+      name.includes('interior emulsion') ||
+      name.includes('waterproofing compound') ||
+      name.includes('dampguard') ||
+      name.includes('bwp plywood') ||
+      name.includes('hdhmr board') ||
+      name.includes('wood adhesive') ||
+      name.includes('kitchen sink') ||
+      name.includes('swan neck') ||
+      name.includes('western commode') ||
+      name.includes('concealed cistern') ||
+      name.includes('auto hinges') ||
+      name.includes('drawer channels') ||
+      name.includes('spice rack') ||
+      name.includes('bed lift mechanism') ||
+      name.includes('digital door lock') ||
+      name.includes('padlock') ||
+      name.includes('cpvc pro') ||
+      name.includes('water storage tank') ||
+      name.includes('impact drill') ||
+      name.includes('angle grinder') ||
+      name.includes('step ladder') ||
+      name.includes('tarpaulin sheet')
+    ) {
+      return true;
+    }
   }
 
   return false;
@@ -264,7 +270,7 @@ export function isConstructionProduct(item: any): boolean {
  * Checks if a product or raw database row belongs to Electrical.
  */
 export function isElectricalProduct(item: any): boolean {
-  if (!item) return false;
+  if (!item || typeof item !== 'object') return false;
 
   // Strict check: If it's a construction product, it CANNOT be electrical
   if (isConstructionProduct(item)) {
@@ -272,10 +278,10 @@ export function isElectricalProduct(item: any): boolean {
   }
 
   const id = String(item.id || '').trim();
-  const cat = (item.category || '').toLowerCase().trim();
-  const sub = (item.subcategory || item.subCategory || item.sub_category || '').toLowerCase().trim();
-  const name = (item.name || '').toLowerCase().trim();
-  const brand = (item.brand || '').toLowerCase().trim();
+  const cat = String(item.category || '').toLowerCase().trim();
+  const sub = String(item.subcategory || item.subCategory || item.sub_category || '').toLowerCase().trim();
+  const name = String(item.name || '').toLowerCase().trim();
+  const brand = String(item.brand || '').toLowerCase().trim();
 
   // Known electrical ID patterns (p1, p2, p-fan-*, p-sw-*, p-mcb-*, p-light-*, p-dalda-*, p-gi-*, p-cctv-*, p-app-*)
   if (id.startsWith('p') || id.startsWith('elec')) {
@@ -288,42 +294,48 @@ export function isElectricalProduct(item: any): boolean {
   }
 
   // Electrical subcategories
-  for (const s of ELECTRICAL_SUBCATS) {
-    if (sub.includes(s) || s.includes(sub)) {
-      return true;
+  if (sub) {
+    for (const s of ELECTRICAL_SUBCATS) {
+      if (sub.includes(s) || (sub.length >= 3 && s.includes(sub))) {
+        return true;
+      }
     }
   }
 
   // Electrical brands
-  for (const b of ELECTRICAL_BRANDS) {
-    if (brand.includes(b)) {
-      return true;
+  if (brand) {
+    for (const b of ELECTRICAL_BRANDS) {
+      if (brand.includes(b) || (brand.length >= 3 && b.includes(brand))) {
+        return true;
+      }
     }
   }
 
   // Check electrical product names
-  if (
-    name.includes('wire') ||
-    name.includes('cable') ||
-    name.includes('fan') ||
-    name.includes('switch') ||
-    name.includes('socket') ||
-    name.includes('regulator') ||
-    name.includes('mcb') ||
-    name.includes('distribution board') ||
-    name.includes('led bulb') ||
-    name.includes('panel light') ||
-    name.includes('floodlight') ||
-    name.includes('conduit pipe') ||
-    name.includes('dalda') ||
-    name.includes('gi box') ||
-    name.includes('security camera') ||
-    name.includes('dvr') ||
-    name.includes('water heater') ||
-    name.includes('geyser') ||
-    name.includes('inverter')
-  ) {
-    return true;
+  if (name) {
+    if (
+      name.includes('wire') ||
+      name.includes('cable') ||
+      name.includes('fan') ||
+      name.includes('switch') ||
+      name.includes('socket') ||
+      name.includes('regulator') ||
+      name.includes('mcb') ||
+      name.includes('distribution board') ||
+      name.includes('led bulb') ||
+      name.includes('panel light') ||
+      name.includes('floodlight') ||
+      name.includes('conduit pipe') ||
+      name.includes('dalda') ||
+      name.includes('gi box') ||
+      name.includes('security camera') ||
+      name.includes('dvr') ||
+      name.includes('water heater') ||
+      name.includes('geyser') ||
+      name.includes('inverter')
+    ) {
+      return true;
+    }
   }
 
   return false;

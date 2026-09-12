@@ -41,7 +41,7 @@ const QUICK_SUGGESTIONS = [
   '📞 Talk to Human Agent'
 ];
 
-export const HelpCenterChat: React.FC<HelpCenterChatProps> = ({ userProfile }) => {
+export const HelpCenterChat = ({ userProfile }: HelpCenterChatProps) => {
   const [messages, setMessages] = useState<Message[]>([
     {
       id: 'welcome-1',

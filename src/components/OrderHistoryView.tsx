@@ -45,13 +45,13 @@ interface OrderHistoryViewProps {
   onRefresh?: () => Promise<void> | void;
 }
 
-export const OrderHistoryView: React.FC<OrderHistoryViewProps> = ({
+export const OrderHistoryView = ({
   orders,
   userProfile,
   onOpenShop,
   onBack,
   onRefresh
-}) => {
+}: OrderHistoryViewProps) => {
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
   const [deletingOrderId, setDeletingOrderId] = useState<string | null>(null);
   const [isClearingAll, setIsClearingAll] = useState(false);

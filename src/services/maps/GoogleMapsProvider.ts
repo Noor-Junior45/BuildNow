@@ -1,6 +1,7 @@
 import L from 'leaflet';
 import { IMapProvider, IMapInstance, MapCoordinates, MapInitOptions, MapSearchResult, ReverseGeocodeResult } from './types';
 import { API_BASE_URL } from '../../lib/apiBase';
+import { generateSecureToken } from '../../utils/cryptoHelper';
 
 const DEFAULT_GOOGLE_MAPS_KEY = 'AIzaSyAl3I8BhuJ2MwVWzoB5Ov3_-FHJuY6FBeA';
 
@@ -257,7 +258,7 @@ export class GoogleMapsProvider implements IMapProvider {
         const data = await response.json();
         if (data.success && Array.isArray(data.results) && data.results.length > 0) {
           return data.results.map((r: any) => ({
-            id: r.id || `google-${Math.random().toString(36).substring(2, 8)}`,
+            id: r.id || generateSecureToken('google', 8),
             name: r.name,
             secondaryText: r.secondaryText || 'Kolkata, West Bengal',
             lat: r.lat,

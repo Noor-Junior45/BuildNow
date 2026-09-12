@@ -70,7 +70,7 @@ const isPhoneInput = (input: string): boolean => {
   return digits.length >= 7;
 };
 
-export const LoginPage: React.FC<LoginPageProps> = ({ onAuthSuccess }) => {
+export const LoginPage = ({ onAuthSuccess }: LoginPageProps) => {
   const navigate = useNavigate();
 
   // Mode: 'signin' | 'signup' | 'forgot'

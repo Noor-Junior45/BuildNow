@@ -60,7 +60,7 @@ interface LiveOrderRealMapProps {
   deliveryPartnerName?: string;
 }
 
-export const LiveOrderRealMap: React.FC<LiveOrderRealMapProps> = ({
+export const LiveOrderRealMap = ({
   warehouse,
   destination,
   distanceKm,
@@ -68,7 +68,7 @@ export const LiveOrderRealMap: React.FC<LiveOrderRealMapProps> = ({
   isPartnerAssigned,
   riderLocation,
   deliveryPartnerName
-}) => {
+}: LiveOrderRealMapProps) => {
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
   const mapInstanceRef = useRef<L.Map | null>(null);
   const warehouseMarkerRef = useRef<L.Marker | null>(null);

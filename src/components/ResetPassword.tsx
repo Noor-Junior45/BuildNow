@@ -9,7 +9,7 @@ interface ResetPasswordProps {
   onOpenAuth?: () => void;
 }
 
-export const ResetPassword: React.FC<ResetPasswordProps> = ({ onSuccess, onOpenAuth }) => {
+export const ResetPassword = ({ onSuccess, onOpenAuth }: ResetPasswordProps) => {
   const navigate = useNavigate();
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');

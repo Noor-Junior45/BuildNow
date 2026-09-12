@@ -28,10 +28,10 @@ interface TechnicianDetailPageProps {
   onBack?: () => void;
 }
 
-export const TechnicianDetailPage: React.FC<TechnicianDetailPageProps> = ({
+export const TechnicianDetailPage = ({
   technician: propTechnician,
   onBack: propOnBack
-}) => {
+}: TechnicianDetailPageProps) => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const location = useLocation();

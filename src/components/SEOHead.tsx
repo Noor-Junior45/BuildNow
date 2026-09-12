@@ -18,13 +18,13 @@ interface SEOHeadProps {
   };
 }
 
-export const SEOHead: React.FC<SEOHeadProps> = ({
+export const SEOHead = ({
   title,
   description,
   keywords,
   image,
   productData
-}) => {
+}: SEOHeadProps) => {
   const location = useLocation();
 
   useEffect(() => {

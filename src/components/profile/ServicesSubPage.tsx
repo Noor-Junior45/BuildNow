@@ -5,7 +5,7 @@ interface ServicesSubPageProps {
   onBack: () => void;
 }
 
-export const ServicesSubPage: React.FC<ServicesSubPageProps> = ({ onBack }) => {
+export const ServicesSubPage = ({ onBack }: ServicesSubPageProps) => {
   return (
     <div className="min-h-screen bg-white text-black pb-20">
       <div className="border-b border-slate-200 px-4 py-3.5 flex items-center gap-3">
