@@ -137,7 +137,7 @@ export async function getRazorpayConfig(): Promise<RazorpayConfigResponse> {
     console.warn('Could not fetch Razorpay config, using fallback:', err);
     return {
       success: false,
-      keyId: (import.meta.env.VITE_RAZORPAY_KEY_ID as string) || 'rzp_test_demo',
+      keyId: (import.meta.env.VITE_RAZORPAY_KEY_ID as string) || '',
       isConfigured: false,
       merchantName: 'SmartRun',
       currency: 'INR'
@@ -412,7 +412,7 @@ export async function launchRazorpayCheckout(
     serverOrder?.keyId ||
     (import.meta.env.VITE_RAZORPAY_KEY_ID as string) ||
     config.keyId ||
-    'rzp_test_TZw5E2BUHZrnOU';
+    '';
 
   const isRealRazorpayKey = Boolean(
     effectiveKeyId &&

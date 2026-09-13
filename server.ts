@@ -970,7 +970,7 @@ function getServerSupabase(): any {
   const anonKey = (
     process.env.VITE_SUPABASE_ANON_KEY ||
     process.env.SUPABASE_ANON_KEY ||
-    "sb_publishable_C7DzW73hItwOaxr9R4Z2dw_HtjCqHaS"
+    ""
   ).trim();
 
   const key = serviceRoleKey || anonKey;
@@ -1374,7 +1374,7 @@ async function startServer() {
   // =========================================================================
   // GOOGLE MAPS PLATFORM PROXY ENDPOINTS (PRIMARY)
   // =========================================================================
-  const DEFAULT_GOOGLE_MAPS_KEY = "AIzaSyAl3I8BhuJ2MwVWzoB5Ov3_-FHJuY6FBeA";
+  const DEFAULT_GOOGLE_MAPS_KEY = "";
 
   // Google Maps Reverse Geocoding Proxy
   app.get("/api/maps/google/rev-geocode", async (req, res) => {
@@ -2518,7 +2518,7 @@ async function startServer() {
   // =========================================================================
   // RAZORPAY PAYMENT GATEWAY & REFUND ENDPOINTS
   // =========================================================================
-  const DEFAULT_RAZORPAY_KEY_ID = "rzp_test_TZw5E2BUHZrnOU";
+  const DEFAULT_RAZORPAY_KEY_ID = "";
 
   function sanitizeEnvValue(val?: string): string {
     if (!val) return "";
