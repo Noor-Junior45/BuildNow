@@ -6,7 +6,7 @@ const env = typeof import.meta !== 'undefined' && import.meta.env ? import.meta.
 const supabaseUrl =
   env.VITE_SUPABASE_URL || 'https://iffdkhzctkbglmvaayeh.supabase.co';
 const supabaseAnonKey =
-  env.VITE_SUPABASE_ANON_KEY || 'sb_publishable_C7DzW73hItwOaxr9R4Z2dw_HtjCqHaS';
+  env.VITE_SUPABASE_ANON_KEY || '';
 
 if (!env.VITE_SUPABASE_URL || !env.VITE_SUPABASE_ANON_KEY) {
   console.warn(

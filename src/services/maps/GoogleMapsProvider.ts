@@ -3,7 +3,7 @@ import { IMapProvider, IMapInstance, MapCoordinates, MapInitOptions, MapSearchRe
 import { API_BASE_URL } from '../../lib/apiBase';
 import { generateSecureToken } from '../../utils/cryptoHelper';
 
-const DEFAULT_GOOGLE_MAPS_KEY = 'AIzaSyAl3I8BhuJ2MwVWzoB5Ov3_-FHJuY6FBeA';
+const DEFAULT_GOOGLE_MAPS_KEY = '';
 
 let googleMapsScriptLoadingPromise: Promise<boolean> | null = null;
 let googleMapsAuthFailed = false;
