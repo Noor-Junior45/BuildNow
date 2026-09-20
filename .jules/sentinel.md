@@ -1,0 +1,4 @@
+## 2025-03-08 - Critical Authorization Bypass in Order Deletion
+**Vulnerability:** The server exposes the `/api/orders/:id`, `/api/orders`, and `/api/orders/clear` endpoints to anonymous, unauthenticated callers. This allows anyone to maliciously delete or clear other users' orders.
+**Learning:** This exposes the application to Insecure Direct Object References (IDOR) and mass data destruction risks since the endpoints had no middleware to require the existing API secret before processing deletion requests on the server-side Supabase client.
+**Prevention:** Critical endpoints executing destructive actions (like data deletion/clearing) MUST incorporate the `requireApiSecret` middleware or perform explicit user authentication checks before executing database queries using the service-role client.

@@ -1271,7 +1271,7 @@ async function startServer() {
   });
 
   // Delete specific order from Supabase and Server Caches
-  app.delete("/api/orders/:id", async (req, res) => {
+  app.delete("/api/orders/:id", requireApiSecret, async (req, res) => {
     res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
     try {
       const orderId = req.params.id;
@@ -1321,7 +1321,7 @@ async function startServer() {
   });
 
   // Clear all user orders from Supabase database
-  app.delete("/api/orders", async (req, res) => {
+  app.delete("/api/orders", requireApiSecret, async (req, res) => {
     res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
     try {
       const { userId, email, phone } = req.query as { userId?: string; email?: string; phone?: string };
@@ -1385,7 +1385,7 @@ async function startServer() {
   });
 
   // POST alias for clear orders in case environment restricts DELETE with query params
-  app.post("/api/orders/clear", async (req, res) => {
+  app.post("/api/orders/clear", requireApiSecret, async (req, res) => {
     res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
     try {
       const { userId, email, phone, orderIds } = req.body || {};
