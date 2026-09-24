@@ -43,7 +43,7 @@ service cloud.firestore {
     // Public Product Catalog
     match /products/{productId} {
       allow read: if true;
-      allow write: if true; // Allows initial sync & updates
+      allow write: if isAdmin(); // Allows initial sync & updates
     }
 
     // Customer Quick-Commerce Orders
@@ -71,8 +71,8 @@ service cloud.firestore {
 
     // User Profile Documents
     match /users/{userId} {
-      allow read: if true;
-      allow create, update: if isValidId(userId);
+      allow read: if isOwner(userId) || isAdmin();
+      allow create, update: if isValidId(userId) && (!('role' in incoming()) || incoming().role != 'admin' || isAdmin());
       allow delete: if isOwner(userId) || isAdmin();
     }
 
