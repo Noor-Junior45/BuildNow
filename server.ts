@@ -1279,24 +1279,43 @@ async function startServer() {
         return res.status(400).json({ success: false, message: "Order ID is required." });
       }
 
+      const authHeader = req.headers.authorization;
+      if (!authHeader || !authHeader.startsWith("Bearer ")) {
+        return res.status(401).json({ success: false, message: "Unauthorized: Missing or invalid token." });
+      }
+      const token = authHeader.split(" ")[1];
+
       const sb = getServerSupabase();
-      if (sb) {
-        try {
-          // Delete child order items first
-          await sb.from("order_items").delete().eq("order_id", orderId);
-        } catch (itemErr) {
-          console.warn("[Server Delete order_items notice]:", itemErr);
+      if (!sb) {
+        return res.status(500).json({ success: false, message: "Database connection unavailable." });
+      }
+
+      const { data: authData, error: authErr } = await sb.auth.getUser(token);
+      if (authErr || !authData?.user) {
+        return res.status(401).json({ success: false, message: "Unauthorized: Invalid token." });
+      }
+      const authenticatedUserId = authData.user.id;
+
+      try {
+        const { data: orderData, error: orderErr } = await sb.from("orders").select("user_id").eq("id", orderId).single();
+        if (orderErr || !orderData) {
+           return res.status(404).json({ success: false, message: "Order not found." });
         }
 
-        try {
-          // Delete the order itself
-          const { error } = await sb.from("orders").delete().eq("id", orderId);
-          if (error) {
-            console.warn("[Server Delete order DB error]:", error.message);
-          }
-        } catch (ordErr) {
-          console.warn("[Server Delete orders notice]:", ordErr);
+        if (orderData.user_id !== authenticatedUserId) {
+           return res.status(403).json({ success: false, message: "Forbidden: You don't own this order." });
         }
+
+        // Delete child order items first
+        await sb.from("order_items").delete().eq("order_id", orderId);
+
+        // Delete the order itself
+        const { error } = await sb.from("orders").delete().eq("id", orderId);
+        if (error) {
+          console.warn("[Server Delete order DB error]:", error.message);
+        }
+      } catch (dbErr) {
+         console.warn("[Server Delete orders notice]:", dbErr);
       }
 
       // Evict from server idempotency cache if present
@@ -1325,9 +1344,30 @@ async function startServer() {
     res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
     try {
       const { userId, email, phone } = req.query as { userId?: string; email?: string; phone?: string };
-      const sb = getServerSupabase();
 
-      if (sb && (userId || email || phone)) {
+      const authHeader = req.headers.authorization;
+      if (!authHeader || !authHeader.startsWith("Bearer ")) {
+        return res.status(401).json({ success: false, message: "Unauthorized: Missing or invalid token." });
+      }
+      const token = authHeader.split(" ")[1];
+
+      const sb = getServerSupabase();
+      if (!sb) {
+        return res.status(500).json({ success: false, message: "Database connection unavailable." });
+      }
+
+      const { data: authData, error: authErr } = await sb.auth.getUser(token);
+      if (authErr || !authData?.user) {
+        return res.status(401).json({ success: false, message: "Unauthorized: Invalid token." });
+      }
+      const authenticatedUserId = authData.user.id;
+
+      // Ensure users can only clear their own orders
+      if (userId && userId !== authenticatedUserId) {
+        return res.status(403).json({ success: false, message: "Forbidden: Cannot clear orders for another user." });
+      }
+
+      if (userId || email || phone) {
         try {
           if (userId) {
             const { data: userOrders } = await sb.from("orders").select("id").eq("user_id", userId);
@@ -1337,24 +1377,26 @@ async function startServer() {
             }
             await sb.from("orders").delete().eq("user_id", userId);
           }
-          if (email && email.includes("@")) {
+          if (email && email.includes("@") && authData.user.email === email) {
             const cleanEmail = email.trim().toLowerCase();
             const { data: emailOrders } = await sb
               .from("orders")
               .select("id")
+              .eq("user_id", authenticatedUserId)
               .or(`customer_email.ilike.${cleanEmail},recipient_email.ilike.${cleanEmail}`);
             if (emailOrders && emailOrders.length > 0) {
               const ids = emailOrders.map((o: any) => o.id);
               await sb.from("order_items").delete().in("order_id", ids);
             }
-            await sb.from("orders").delete().or(`customer_email.ilike.${cleanEmail},recipient_email.ilike.${cleanEmail}`);
+            await sb.from("orders").delete().eq("user_id", authenticatedUserId).or(`customer_email.ilike.${cleanEmail},recipient_email.ilike.${cleanEmail}`);
           }
-          if (phone) {
+          if (phone && authData.user.phone === phone) {
             const cleanPhone = phone.replace(/\D/g, "").slice(-10);
             if (cleanPhone) {
               const { data: phoneOrders } = await sb
                 .from("orders")
                 .select("id")
+                .eq("user_id", authenticatedUserId)
                 .or(`phone.eq.${cleanPhone},phone.eq.+91${cleanPhone},recipient_phone.eq.${cleanPhone},recipient_phone.eq.+91${cleanPhone}`);
               if (phoneOrders && phoneOrders.length > 0) {
                 const ids = phoneOrders.map((o: any) => o.id);
@@ -1363,6 +1405,7 @@ async function startServer() {
               await sb
                 .from("orders")
                 .delete()
+                .eq("user_id", authenticatedUserId)
                 .or(`phone.eq.${cleanPhone},phone.eq.+91${cleanPhone},recipient_phone.eq.${cleanPhone},recipient_phone.eq.+91${cleanPhone}`);
             }
           }
@@ -1389,38 +1432,64 @@ async function startServer() {
     res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
     try {
       const { userId, email, phone, orderIds } = req.body || {};
-      const sb = getServerSupabase();
 
-      if (sb) {
-        try {
-          if (Array.isArray(orderIds) && orderIds.length > 0) {
-            await sb.from("order_items").delete().in("order_id", orderIds);
-            await sb.from("orders").delete().in("id", orderIds);
+      const authHeader = req.headers.authorization;
+      if (!authHeader || !authHeader.startsWith("Bearer ")) {
+        return res.status(401).json({ success: false, message: "Unauthorized: Missing or invalid token." });
+      }
+      const token = authHeader.split(" ")[1];
+
+      const sb = getServerSupabase();
+      if (!sb) {
+        return res.status(500).json({ success: false, message: "Database connection unavailable." });
+      }
+
+      const { data: authData, error: authErr } = await sb.auth.getUser(token);
+      if (authErr || !authData?.user) {
+        return res.status(401).json({ success: false, message: "Unauthorized: Invalid token." });
+      }
+      const authenticatedUserId = authData.user.id;
+
+      // Ensure users can only clear their own orders
+      if (userId && userId !== authenticatedUserId) {
+         return res.status(403).json({ success: false, message: "Forbidden: Cannot clear orders for another user." });
+      }
+
+      try {
+        if (Array.isArray(orderIds) && orderIds.length > 0) {
+          // Verify ownership of the orders to be cleared
+          const { data: verifyOrders } = await sb.from("orders").select("id").in("id", orderIds).eq("user_id", authenticatedUserId);
+          const validOrderIds = verifyOrders ? verifyOrders.map((o: any) => o.id) : [];
+
+          if (validOrderIds.length > 0) {
+            await sb.from("order_items").delete().in("order_id", validOrderIds);
+            await sb.from("orders").delete().in("id", validOrderIds);
           }
-          if (userId) {
-            const { data: userOrders } = await sb.from("orders").select("id").eq("user_id", userId);
-            if (userOrders && userOrders.length > 0) {
-              const ids = userOrders.map((o: any) => o.id);
-              await sb.from("order_items").delete().in("order_id", ids);
-            }
-            await sb.from("orders").delete().eq("user_id", userId);
-          }
-          if (email && email.includes("@")) {
-            const cleanEmail = email.trim().toLowerCase();
-            await sb.from("orders").delete().or(`customer_email.ilike.${cleanEmail},recipient_email.ilike.${cleanEmail}`);
-          }
-          if (phone) {
-            const cleanPhone = phone.replace(/\D/g, "").slice(-10);
-            if (cleanPhone) {
-              await sb
-                .from("orders")
-                .delete()
-                .or(`phone.eq.${cleanPhone},phone.eq.+91${cleanPhone},recipient_phone.eq.${cleanPhone},recipient_phone.eq.+91${cleanPhone}`);
-            }
-          }
-        } catch (dbErr) {
-          console.warn("[Server POST /api/orders/clear DB Notice]:", dbErr);
         }
+        if (userId) {
+          const { data: userOrders } = await sb.from("orders").select("id").eq("user_id", userId);
+          if (userOrders && userOrders.length > 0) {
+            const ids = userOrders.map((o: any) => o.id);
+            await sb.from("order_items").delete().in("order_id", ids);
+          }
+          await sb.from("orders").delete().eq("user_id", userId);
+        }
+        if (email && email.includes("@") && authData.user.email === email) {
+          const cleanEmail = email.trim().toLowerCase();
+          await sb.from("orders").delete().eq("user_id", authenticatedUserId).or(`customer_email.ilike.${cleanEmail},recipient_email.ilike.${cleanEmail}`);
+        }
+        if (phone && authData.user.phone === phone) {
+          const cleanPhone = phone.replace(/\D/g, "").slice(-10);
+          if (cleanPhone) {
+            await sb
+              .from("orders")
+              .delete()
+              .eq("user_id", authenticatedUserId)
+              .or(`phone.eq.${cleanPhone},phone.eq.+91${cleanPhone},recipient_phone.eq.${cleanPhone},recipient_phone.eq.+91${cleanPhone}`);
+          }
+        }
+      } catch (dbErr) {
+        console.warn("[Server POST /api/orders/clear DB Notice]:", dbErr);
       }
 
       return res.status(200).json({
