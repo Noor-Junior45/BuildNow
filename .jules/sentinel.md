@@ -1,0 +1,4 @@
+## 2024-05-24 - [CRITICAL] Fix IDOR in Order Deletion Endpoints
+**Vulnerability:** The server API endpoints for deleting orders (`DELETE /api/orders/:id`, `DELETE /api/orders`, and `POST /api/orders/clear`) lacked authentication and authorization checks. Anyone could send a request to these endpoints and delete orders belonging to any user, leading to Insecure Direct Object Reference (IDOR).
+**Learning:** Even though the frontend might have role checks, the backend API must verify the identity and ownership of the user making the request. A malicious actor could easily bypass the frontend and interact with the API directly.
+**Prevention:** Always authenticate the incoming API requests (e.g., using `sb.auth.getUser(token)`) and explicitly check if the authenticated user has the right to modify the specific resource (e.g., `orderData.user_id === authenticatedUserId`). Provide the JWT in the `Authorization` header from the client side.
