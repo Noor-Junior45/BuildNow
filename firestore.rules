@@ -43,7 +43,7 @@ service cloud.firestore {
     // Public Product Catalog
     match /products/{productId} {
       allow read: if true;
-      allow write: if true; // Allows initial sync & updates
+      allow write: if isAdmin(); // Allows initial sync & updates
     }
 
     // Customer Quick-Commerce Orders
@@ -78,12 +78,12 @@ service cloud.firestore {
 
     // Saved Addresses
     match /user_addresses/{addressId} {
-      allow read, write: if true;
+      allow read, write: if isSignedIn();
     }
 
     // Saved UPI Handles
     match /user_upi/{upiId} {
-      allow read, write: if true;
+      allow read, write: if isSignedIn();
     }
   }
 }
