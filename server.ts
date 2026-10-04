@@ -1083,7 +1083,7 @@ async function startServer() {
   });
 
   // Clear in-memory catalog cache on demand (e.g. after admin sync)
-  app.post("/api/products/cache/clear", (req, res) => {
+  app.post("/api/products/cache/clear", requireApiSecret, (req, res) => {
     catalogCache = null;
     res.setHeader("Cache-Control", "no-store");
     res.json({ success: true, message: "Server in-memory catalog cache purged." });
@@ -1271,7 +1271,7 @@ async function startServer() {
   });
 
   // Delete specific order from Supabase and Server Caches
-  app.delete("/api/orders/:id", async (req, res) => {
+  app.delete("/api/orders/:id", requireApiSecret, async (req, res) => {
     res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
     try {
       const orderId = req.params.id;
@@ -1321,7 +1321,7 @@ async function startServer() {
   });
 
   // Clear all user orders from Supabase database
-  app.delete("/api/orders", async (req, res) => {
+  app.delete("/api/orders", requireApiSecret, async (req, res) => {
     res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
     try {
       const { userId, email, phone } = req.query as { userId?: string; email?: string; phone?: string };
@@ -1385,7 +1385,7 @@ async function startServer() {
   });
 
   // POST alias for clear orders in case environment restricts DELETE with query params
-  app.post("/api/orders/clear", async (req, res) => {
+  app.post("/api/orders/clear", requireApiSecret, async (req, res) => {
     res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
     try {
       const { userId, email, phone, orderIds } = req.body || {};
@@ -1649,7 +1649,7 @@ async function startServer() {
   // =========================================================================
 
   // 1. Get all received inbound emails & contact inquiries
-  app.get("/api/received-emails", (req, res) => {
+  app.get("/api/received-emails", requireApiSecret, (req, res) => {
     const unreadCount = receivedEmailsStore.filter((m) => m.status === "unread").length;
     res.json({
       success: true,
@@ -1837,7 +1837,7 @@ async function startServer() {
   });
 
   // 4. Send a reply to a received email
-  app.post("/api/received-emails/:id/reply", async (req, res) => {
+  app.post("/api/received-emails/:id/reply", requireApiSecret, async (req, res) => {
     try {
       const { id } = req.params;
       const { replyText, subject: customSubject } = req.body;
@@ -1907,7 +1907,7 @@ async function startServer() {
   });
 
   // 5. Update received email status (read, unread, archived)
-  app.patch("/api/received-emails/:id", (req, res) => {
+  app.patch("/api/received-emails/:id", requireApiSecret, (req, res) => {
     const { id } = req.params;
     const { status } = req.body;
 
@@ -1927,14 +1927,14 @@ async function startServer() {
   });
 
   // 6. Delete a received email
-  app.delete("/api/received-emails/:id", (req, res) => {
+  app.delete("/api/received-emails/:id", requireApiSecret, (req, res) => {
     const { id } = req.params;
     receivedEmailsStore = receivedEmailsStore.filter((m) => m.id !== id);
     res.json({ success: true, message: "Email removed from inbound inbox." });
   });
 
   // 7. Simulate an incoming inbound email (for quick testing)
-  app.post("/api/received-emails/simulate-inbound", (req, res) => {
+  app.post("/api/received-emails/simulate-inbound", requireApiSecret, (req, res) => {
     const { from, fromName, subject, text, category } = req.body;
     const newRecord: ReceivedEmailRecord = {
       id: `inbound-test-${Date.now()}`,
