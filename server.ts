@@ -210,6 +210,18 @@ async function dispatchResendEmail(options: ResendDispatchOptions): Promise<Rese
   };
 }
 
+
+// HTML Escaping Helper to prevent XSS in email templates
+function escapeHtml(unsafe: string | null | undefined): string {
+  if (typeof unsafe !== 'string') return '';
+  return unsafe
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
 // HTML Generator for Order Confirmation Invoice Email
 function generateOrderEmailHtml(order: any, customerName: string): string {
   const itemsListHtml = (order.items || [])
@@ -273,11 +285,11 @@ function generateOrderEmailHtml(order: any, customerName: string): string {
           </tr>
           <tr>
             <td style="font-size: 13px; color: #854d0e; font-weight: bold; padding-top: 6px;">Customer:</td>
-            <td style="font-size: 13px; color: #0f172a; font-weight: 600; text-align: right; padding-top: 6px;">${customerName || order.customerName || 'Valued Customer'}</td>
+            <td style="font-size: 13px; color: #0f172a; font-weight: 600; text-align: right; padding-top: 6px;">${escapeHtml(customerName || order.customerName || 'Valued Customer')}</td>
           </tr>
           <tr>
             <td style="font-size: 13px; color: #854d0e; font-weight: bold; padding-top: 6px;">Delivery Area:</td>
-            <td style="font-size: 13px; color: #0f172a; font-weight: 600; text-align: right; padding-top: 6px;">${order.area || 'Kolkata Central'}, PIN: ${order.pincode || '700001'}</td>
+            <td style="font-size: 13px; color: #0f172a; font-weight: 600; text-align: right; padding-top: 6px;">${escapeHtml(order.area || 'Kolkata Central')}, PIN: ${order.pincode || '700001'}</td>
           </tr>
           <tr>
             <td style="font-size: 13px; color: #854d0e; font-weight: bold; padding-top: 6px;">Payment:</td>
@@ -335,7 +347,7 @@ function generateOrderEmailHtml(order: any, customerName: string): string {
       <!-- Address & Dispatch Info -->
       <div style="font-size: 12px; color: #475569; line-height: 1.6; border-top: 1px solid #e2e8f0; padding-top: 16px;">
         <strong style="color: #0f172a;">Shipping Address:</strong><br>
-        ${order.address || 'Address on file'}, ${order.area || 'Kolkata'} ${order.landmark ? `(Landmark: ${order.landmark})` : ''}<br>
+        ${escapeHtml(order.address || 'Address on file')}, ${escapeHtml(order.area || 'Kolkata')} ${order.landmark ? `(Landmark: ${escapeHtml(order.landmark)})` : ''}<br>
         <strong>Phone:</strong> ${order.phone || '+91'}<br><br>
         <strong>Central Hub Dispatch:</strong> Giriraj Power, Bediadanga 1st Ln, Nator Park, Kasba, Kolkata 700039
       </div>
@@ -382,7 +394,7 @@ function generateWiringBookingEmailHtml(booking: any, customerName: string): str
 
     <div style="padding: 24px;">
       <p style="font-size: 14px; color: #334155; line-height: 1.6;">
-        Dear <strong>${customerName || booking.contactName || 'Valued Customer'}</strong>,
+        Dear <strong>${escapeHtml(customerName || booking.contactName || 'Valued Customer')}</strong>,
       </p>
       <p style="font-size: 14px; color: #334155; line-height: 1.6;">
         Your booking for certified Kolkata electrical wiring & installation services has been received. Our senior WBSEDCL/CESC licensed electrical supervisor is assigned to your site.
@@ -400,7 +412,7 @@ function generateWiringBookingEmailHtml(booking: any, customerName: string): str
           </tr>
           <tr>
             <td style="color: #64748b; padding-bottom: 8px;"><strong>Property:</strong></td>
-            <td style="color: #0f172a; font-weight: 700; text-align: right; padding-bottom: 8px;">${booking.projectType || '2BHK'} (${booking.approxAreaSqFt || 950} sq.ft)</td>
+            <td style="color: #0f172a; font-weight: 700; text-align: right; padding-bottom: 8px;">${escapeHtml(booking.projectType || '2BHK')} (${booking.approxAreaSqFt || 950} sq.ft)</td>
           </tr>
           <tr>
             <td style="color: #64748b; padding-bottom: 8px;"><strong>Date & Slot:</strong></td>
@@ -408,7 +420,7 @@ function generateWiringBookingEmailHtml(booking: any, customerName: string): str
           </tr>
           <tr>
             <td style="color: #64748b;"><strong>Site Address:</strong></td>
-            <td style="color: #0f172a; font-weight: 600; text-align: right;">${booking.siteAddress || 'Kolkata'}</td>
+            <td style="color: #0f172a; font-weight: 600; text-align: right;">${escapeHtml(booking.siteAddress || 'Kolkata')}</td>
           </tr>
         </table>
       </div>
@@ -560,7 +572,7 @@ function generateAdminOrderAlertHtml(order: any): string {
         <table style="width: 100%; border-collapse: collapse; font-size: 13px; line-height: 1.6;">
           <tr>
             <td style="color: #64748b; width: 35%; padding-bottom: 4px;">Customer Name:</td>
-            <td style="color: #0f172a; font-weight: 800; padding-bottom: 4px;">${order.customerName || 'Valued Customer'}</td>
+            <td style="color: #0f172a; font-weight: 800; padding-bottom: 4px;">${escapeHtml(order.customerName || 'Valued Customer')}</td>
           </tr>
           <tr>
             <td style="color: #64748b; padding-bottom: 4px;">Mobile Phone:</td>
@@ -570,20 +582,20 @@ function generateAdminOrderAlertHtml(order: any): string {
           </tr>
           <tr>
             <td style="color: #64748b; padding-bottom: 4px;">Email:</td>
-            <td style="color: #0f172a; font-weight: 600; padding-bottom: 4px;">${order.customerEmail || 'Not provided (Phone checkout)'}</td>
+            <td style="color: #0f172a; font-weight: 600; padding-bottom: 4px;">${escapeHtml(order.customerEmail || 'Not provided (Phone checkout)')}</td>
           </tr>
           <tr>
             <td style="color: #64748b; padding-bottom: 4px;">Delivery Address:</td>
-            <td style="color: #0f172a; font-weight: 700; padding-bottom: 4px;">${order.address || 'Address on file'}</td>
+            <td style="color: #0f172a; font-weight: 700; padding-bottom: 4px;">${escapeHtml(order.address || 'Address on file')}</td>
           </tr>
           ${order.landmark ? `
           <tr>
             <td style="color: #64748b; padding-bottom: 4px;">Landmark:</td>
-            <td style="color: #0f172a; font-weight: 600; padding-bottom: 4px;">${order.landmark}</td>
+            <td style="color: #0f172a; font-weight: 600; padding-bottom: 4px;">${escapeHtml(order.landmark)}</td>
           </tr>` : ''}
           <tr>
             <td style="color: #64748b; padding-bottom: 4px;">Area & PIN:</td>
-            <td style="color: #0f172a; font-weight: 800; padding-bottom: 4px;">${order.area || 'Kolkata'}, PIN: ${order.pincode || '700001'}</td>
+            <td style="color: #0f172a; font-weight: 800; padding-bottom: 4px;">${escapeHtml(order.area || 'Kolkata')}, PIN: ${order.pincode || '700001'}</td>
           </tr>
           <tr>
             <td style="color: #64748b; padding-bottom: 4px;">Payment Method:</td>
