@@ -1,0 +1,4 @@
+## 2025-05-18 - [High] Cross-Site Scripting (XSS) in Server-Side Email Templates
+**Vulnerability:** The Express backend (`server.ts`) directly interpolated user-controlled input (like `customerName`, `address`, and `landmark` from order submissions) into HTML templates for email generation without any escaping.
+**Learning:** Even though Zod is used for input validation, it only enforces structure and length constraints—it does not sanitize HTML. Injecting unescaped user data into email templates exposes the application to Server-Side XSS, allowing malicious HTML/JS to render in the recipient's email client.
+**Prevention:** Always apply strict HTML escaping (using an `escapeHtml` helper or a specialized template engine) to any user-supplied data before inserting it into server-generated HTML (like emails or dynamic webpages). Do not rely solely on schema validators (like Zod) for sanitization.
