@@ -1,0 +1,4 @@
+## 2024-05-24 - [CRITICAL] Firestore Insecure Direct Object Reference (IDOR/BOLA) in Rules
+**Vulnerability:** The `firestore.rules` file contained `allow read: if true;` and `allow write: if true;` for sensitive collections like user profiles (`/users/{userId}`) and the product catalog (`/products/{productId}`). This allowed any user (even unauthenticated) to overwrite product data or read/modify another user's profile information.
+**Learning:** Default "open" rules were left in place for ease of development but presented a critical BOLA (Broken Object Level Authorization) risk where PII could be scraped or overwritten.
+**Prevention:** Always explicitly define `allow` conditions based on `isOwner(userId)` or `isAdmin()` for any collection containing sensitive user data or system configurations. Default to `allow read, write: if false;` and add granular rules.
