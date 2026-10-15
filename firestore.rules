@@ -43,7 +43,7 @@ service cloud.firestore {
     // Public Product Catalog
     match /products/{productId} {
       allow read: if true;
-      allow write: if true; // Allows initial sync & updates
+      allow write: if isAdmin(); // Allows initial sync & updates
     }
 
     // Customer Quick-Commerce Orders
@@ -71,19 +71,23 @@ service cloud.firestore {
 
     // User Profile Documents
     match /users/{userId} {
-      allow read: if true;
-      allow create, update: if isValidId(userId);
-      allow delete: if isOwner(userId) || isAdmin();
+      allow read, create, update, delete: if isOwner(userId) || isAdmin();
     }
 
     // Saved Addresses
     match /user_addresses/{addressId} {
-      allow read, write: if true;
+      allow read: if isSignedIn() && existing().user_id == request.auth.uid;
+      allow create: if isSignedIn() && incoming().user_id == request.auth.uid;
+      allow update: if isSignedIn() && existing().user_id == request.auth.uid && incoming().user_id == request.auth.uid;
+      allow delete: if isSignedIn() && existing().user_id == request.auth.uid;
     }
 
     // Saved UPI Handles
     match /user_upi/{upiId} {
-      allow read, write: if true;
+      allow read: if isSignedIn() && existing().user_id == request.auth.uid;
+      allow create: if isSignedIn() && incoming().user_id == request.auth.uid;
+      allow update: if isSignedIn() && existing().user_id == request.auth.uid && incoming().user_id == request.auth.uid;
+      allow delete: if isSignedIn() && existing().user_id == request.auth.uid;
     }
   }
 }
