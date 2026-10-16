@@ -822,25 +822,43 @@ const strictLimiter = rateLimit({
   }
 });
 
-// Middleware that reads process.env.API_SECRET_KEY and checks req.headers['x-api-key']
-function requireApiSecret(req: express.Request, res: express.Response, next: express.NextFunction) {
-  const secret = process.env.API_SECRET_KEY;
-  if (!secret) {
-    return res.status(500).json({
-      success: false,
-      message: "API_SECRET_KEY environment variable is not configured."
-    });
-  }
-
-  const clientKey = req.headers["x-api-key"];
-  if (!clientKey || clientKey !== secret) {
+// Middleware that extracts Bearer token and verifies it with Supabase
+async function requireUserAuth(req: express.Request, res: express.Response, next: express.NextFunction) {
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith("Bearer ")) {
     return res.status(401).json({
       success: false,
-      message: "Unauthorized: Invalid or missing API key."
+      message: "Unauthorized: Missing or invalid Authorization header."
     });
   }
 
-  next();
+  const token = authHeader.split(" ")[1];
+  const sb = getServerSupabase();
+  if (!sb) {
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error: Supabase client not initialized."
+    });
+  }
+
+  try {
+    const { data: { user }, error } = await sb.auth.getUser(token);
+    if (error || !user) {
+      return res.status(401).json({
+        success: false,
+        message: "Unauthorized: Invalid or expired token."
+      });
+    }
+
+    // Attach user to request for downstream handlers
+    (req as any).user = user;
+    next();
+  } catch (err) {
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error during authentication."
+    });
+  }
 }
 
 const orderCheckoutLimiter = rateLimit({
@@ -1539,9 +1557,9 @@ async function startServer() {
   // =========================================================================
   // AUTOMATED INSTANT ORDER ALERT DISPATCH (EMAIL + WHATSAPP NOTIFIER)
   // Alerts Admin with full customer details, phone, address, items & quantities
-  // Protected with strictLimiter and requireApiSecret
+  // Protected with strictLimiter and requireUserAuth
   // =========================================================================
-  app.post("/api/notify-order", strictLimiter, requireApiSecret, async (req, res) => {
+  app.post("/api/notify-order", strictLimiter, requireUserAuth, async (req, res) => {
     res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
     try {
       const { order, customerEmail } = req.body;
@@ -1550,6 +1568,28 @@ async function startServer() {
         return res.status(400).json({
           success: false,
           message: "Missing order payload."
+        });
+      }
+
+      const user = (req as any).user;
+
+      // Ownership Check: Ensure the order belongs to the authenticated user
+      const userPhone = (user.phone || user.user_metadata?.phone || "").replace(/\D/g, "").slice(-10);
+      const userEmail = (user.email || user.user_metadata?.email || "").trim().toLowerCase();
+
+      const orderUserId = order.user_id || order.userId;
+      const orderPhone = (order.phone || order.recipient_phone || order.customerPhone || "").replace(/\D/g, "").slice(-10);
+      const orderEmail = (order.customerEmail || order.customer_email || order.recipient_email || "").trim().toLowerCase();
+
+      let isOwner = false;
+      if (orderUserId && String(orderUserId) === String(user.id)) isOwner = true;
+      else if (userEmail && orderEmail && userEmail === orderEmail) isOwner = true;
+      else if (userPhone && orderPhone && userPhone.length === 10 && userPhone === orderPhone) isOwner = true;
+
+      if (!isOwner) {
+        return res.status(403).json({
+          success: false,
+          message: "Forbidden: You do not have permission to perform this action on this order."
         });
       }
 
