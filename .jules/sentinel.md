@@ -1,0 +1,4 @@
+## 2024-05-18 - Missing Authentication on IDOR-vulnerable Delete Endpoints
+**Vulnerability:** The Express backend used `getServerSupabase()`, which uses the `SUPABASE_SERVICE_ROLE_KEY` to bypass RLS. Several destructive endpoints (`DELETE /api/orders/:id`, `DELETE /api/orders`, `POST /api/orders/clear`) invoked this without validating the caller's identity or authorization.
+**Learning:** Client-facing destructive endpoints MUST authenticate the user and authorize the action (e.g., verifying ownership) when the backend itself bypasses database-level Row Level Security.
+**Prevention:** Always require and validate a Supabase JWT session token in the `Authorization` header for any non-admin client-facing endpoint, and enforce ownership checks (`user_id === user.id`) before processing data-modifying requests.

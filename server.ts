@@ -1279,8 +1279,30 @@ async function startServer() {
         return res.status(400).json({ success: false, message: "Order ID is required." });
       }
 
+      const authHeader = req.headers.authorization;
+      if (!authHeader || !authHeader.startsWith("Bearer ")) {
+        return res.status(401).json({ success: false, message: "Unauthorized." });
+      }
+      const token = authHeader.split(" ")[1];
+
       const sb = getServerSupabase();
       if (sb) {
+        const { data: { user }, error: authErr } = await sb.auth.getUser(token);
+        if (authErr || !user) {
+          return res.status(401).json({ success: false, message: "Unauthorized. Invalid token." });
+        }
+
+        const { data: order } = await sb.from("orders").select("user_id").eq("id", orderId).single();
+        if (!order) {
+          return res.status(404).json({ success: false, message: "Order not found." });
+        }
+
+        // Ensure user owns the order, or is an admin (mdhassan1738@gmail.com)
+        const isAdmin = user.email === "mdhassan1738@gmail.com" || (await sb.from("admins").select("id").eq("id", user.id).single()).data;
+        if (order.user_id !== user.id && !isAdmin) {
+          return res.status(403).json({ success: false, message: "Forbidden. You do not have permission to delete this order." });
+        }
+
         try {
           // Delete child order items first
           await sb.from("order_items").delete().eq("order_id", orderId);
@@ -1325,9 +1347,34 @@ async function startServer() {
     res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
     try {
       const { userId, email, phone } = req.query as { userId?: string; email?: string; phone?: string };
-      const sb = getServerSupabase();
 
+      const authHeader = req.headers.authorization;
+      if (!authHeader || !authHeader.startsWith("Bearer ")) {
+        return res.status(401).json({ success: false, message: "Unauthorized." });
+      }
+      const token = authHeader.split(" ")[1];
+
+      const sb = getServerSupabase();
       if (sb && (userId || email || phone)) {
+        const { data: { user }, error: authErr } = await sb.auth.getUser(token);
+        if (authErr || !user) {
+          return res.status(401).json({ success: false, message: "Unauthorized. Invalid token." });
+        }
+
+        const isAdmin = user.email === "mdhassan1738@gmail.com" || (await sb.from("admins").select("id").eq("id", user.id).single()).data;
+
+        if (!isAdmin) {
+          if (userId && userId !== user.id) {
+            return res.status(403).json({ success: false, message: "Forbidden. Cannot delete another user's orders." });
+          }
+          if (email && email.toLowerCase() !== user.email?.toLowerCase()) {
+            return res.status(403).json({ success: false, message: "Forbidden. Cannot delete another user's orders." });
+          }
+          if (phone && phone.replace(/\D/g, "").slice(-10) !== (user.phone || "").replace(/\D/g, "").slice(-10)) {
+            return res.status(403).json({ success: false, message: "Forbidden. Cannot delete another user's orders." });
+          }
+        }
+
         try {
           if (userId) {
             const { data: userOrders } = await sb.from("orders").select("id").eq("user_id", userId);
@@ -1389,9 +1436,43 @@ async function startServer() {
     res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
     try {
       const { userId, email, phone, orderIds } = req.body || {};
+
+      const authHeader = req.headers.authorization;
+      if (!authHeader || !authHeader.startsWith("Bearer ")) {
+        return res.status(401).json({ success: false, message: "Unauthorized." });
+      }
+      const token = authHeader.split(" ")[1];
+
       const sb = getServerSupabase();
 
       if (sb) {
+        const { data: { user }, error: authErr } = await sb.auth.getUser(token);
+        if (authErr || !user) {
+          return res.status(401).json({ success: false, message: "Unauthorized. Invalid token." });
+        }
+
+        const isAdmin = user.email === "mdhassan1738@gmail.com" || (await sb.from("admins").select("id").eq("id", user.id).single()).data;
+
+        if (!isAdmin) {
+          if (userId && userId !== user.id) {
+            return res.status(403).json({ success: false, message: "Forbidden. Cannot delete another user's orders." });
+          }
+          if (email && email.toLowerCase() !== user.email?.toLowerCase()) {
+            return res.status(403).json({ success: false, message: "Forbidden. Cannot delete another user's orders." });
+          }
+          if (phone && phone.replace(/\D/g, "").slice(-10) !== (user.phone || "").replace(/\D/g, "").slice(-10)) {
+            return res.status(403).json({ success: false, message: "Forbidden. Cannot delete another user's orders." });
+          }
+
+          if (Array.isArray(orderIds) && orderIds.length > 0) {
+             const { data: ordersData } = await sb.from("orders").select("user_id").in("id", orderIds);
+             const anyOtherUserOrder = ordersData?.some((o: any) => o.user_id !== user.id);
+             if (anyOtherUserOrder) {
+               return res.status(403).json({ success: false, message: "Forbidden. Cannot delete another user's orders." });
+             }
+          }
+        }
+
         try {
           if (Array.isArray(orderIds) && orderIds.length > 0) {
             await sb.from("order_items").delete().in("order_id", orderIds);
