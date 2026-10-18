@@ -843,6 +843,40 @@ function requireApiSecret(req: express.Request, res: express.Response, next: exp
   next();
 }
 
+// Middleware to authenticate regular users via Supabase JWT
+async function requireUserAuth(req: express.Request, res: express.Response, next: express.NextFunction) {
+  const authHeader = req.headers["authorization"];
+  if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    return res.status(401).json({
+      success: false,
+      message: "Unauthorized: Missing or invalid Authorization header."
+    });
+  }
+
+  const token = authHeader.split(" ")[1];
+  const sb = getServerSupabase();
+  if (!sb) {
+    return res.status(500).json({
+      success: false,
+      message: "Server configuration error."
+    });
+  }
+
+  try {
+    const { data: { user }, error } = await sb.auth.getUser(token);
+    if (error || !user) {
+      return res.status(401).json({
+        success: false,
+        message: "Unauthorized: Invalid token."
+      });
+    }
+    (req as any).user = user;
+    next();
+  } catch (err) {
+    return res.status(500).json({ success: false, message: "Internal server error during authentication." });
+  }
+}
+
 const orderCheckoutLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 30, // 30 checkout submissions per 15 mins per IP
@@ -1271,7 +1305,7 @@ async function startServer() {
   });
 
   // Delete specific order from Supabase and Server Caches
-  app.delete("/api/orders/:id", async (req, res) => {
+  app.delete("/api/orders/:id", requireUserAuth, async (req, res) => {
     res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
     try {
       const orderId = req.params.id;
@@ -1281,6 +1315,24 @@ async function startServer() {
 
       const sb = getServerSupabase();
       if (sb) {
+        const requestingUser = (req as any).user;
+        const isAdmin = requestingUser?.email === 'mdhassan1738@gmail.com' || ADMIN_EMAILS.includes(requestingUser?.email);
+
+        if (!isAdmin) {
+            const { data: orderData } = await sb.from("orders").select("user_id, customer_email, phone, recipient_phone, recipient_email").eq("id", orderId).single();
+            if (!orderData) {
+                return res.status(404).json({ success: false, message: "Order not found." });
+            }
+
+            const isOwner = orderData.user_id === requestingUser.id ||
+                           (orderData.customer_email && orderData.customer_email === requestingUser.email) ||
+                           (orderData.phone && orderData.phone.replace(/\D/g, "").slice(-10) === requestingUser.phone?.replace(/\D/g, "").slice(-10));
+
+            if (!isOwner) {
+                return res.status(403).json({ success: false, message: "Forbidden: You don't have permission to delete this order." });
+            }
+        }
+
         try {
           // Delete child order items first
           await sb.from("order_items").delete().eq("order_id", orderId);
@@ -1321,24 +1373,38 @@ async function startServer() {
   });
 
   // Clear all user orders from Supabase database
-  app.delete("/api/orders", async (req, res) => {
+  app.delete("/api/orders", requireUserAuth, async (req, res) => {
     res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
     try {
       const { userId, email, phone } = req.query as { userId?: string; email?: string; phone?: string };
       const sb = getServerSupabase();
 
       if (sb && (userId || email || phone)) {
+        const requestingUser = (req as any).user;
+        const isAdmin = requestingUser?.email === 'mdhassan1738@gmail.com' || ADMIN_EMAILS.includes(requestingUser?.email);
+
+        if (!isAdmin) {
+            // Secure override: Ignore query parameters from user and FORCE using their own authenticated identity
+            req.query.userId = requestingUser.id;
+            req.query.email = requestingUser.email;
+            req.query.phone = requestingUser.phone;
+        }
+
+        const safeUserId = req.query.userId as string | undefined;
+        const safeEmail = req.query.email as string | undefined;
+        const safePhone = req.query.phone as string | undefined;
+
         try {
-          if (userId) {
-            const { data: userOrders } = await sb.from("orders").select("id").eq("user_id", userId);
+          if (safeUserId) {
+            const { data: userOrders } = await sb.from("orders").select("id").eq("user_id", safeUserId);
             if (userOrders && userOrders.length > 0) {
               const ids = userOrders.map((o: any) => o.id);
               await sb.from("order_items").delete().in("order_id", ids);
             }
-            await sb.from("orders").delete().eq("user_id", userId);
+            await sb.from("orders").delete().eq("user_id", safeUserId);
           }
-          if (email && email.includes("@")) {
-            const cleanEmail = email.trim().toLowerCase();
+          if (safeEmail && safeEmail.includes("@")) {
+            const cleanEmail = safeEmail.trim().toLowerCase();
             const { data: emailOrders } = await sb
               .from("orders")
               .select("id")
@@ -1349,8 +1415,8 @@ async function startServer() {
             }
             await sb.from("orders").delete().or(`customer_email.ilike.${cleanEmail},recipient_email.ilike.${cleanEmail}`);
           }
-          if (phone) {
-            const cleanPhone = phone.replace(/\D/g, "").slice(-10);
+          if (safePhone) {
+            const cleanPhone = safePhone.replace(/\D/g, "").slice(-10);
             if (cleanPhone) {
               const { data: phoneOrders } = await sb
                 .from("orders")
@@ -1385,32 +1451,48 @@ async function startServer() {
   });
 
   // POST alias for clear orders in case environment restricts DELETE with query params
-  app.post("/api/orders/clear", async (req, res) => {
+  app.post("/api/orders/clear", requireUserAuth, async (req, res) => {
     res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
     try {
       const { userId, email, phone, orderIds } = req.body || {};
       const sb = getServerSupabase();
 
       if (sb) {
+        const requestingUser = (req as any).user;
+        const isAdmin = requestingUser?.email === 'mdhassan1738@gmail.com' || ADMIN_EMAILS.includes(requestingUser?.email);
+
+        if (!isAdmin) {
+            // Secure override: Ignore input parameters from user and FORCE using their own authenticated identity
+            req.body.orderIds = []; // Prevent bulk deletion of specific arbitrary IDs for non-admins
+            req.body.userId = requestingUser.id;
+            req.body.email = requestingUser.email;
+            req.body.phone = requestingUser.phone;
+        }
+
+        const safeUserId = req.body.userId as string | undefined;
+        const safeEmail = req.body.email as string | undefined;
+        const safePhone = req.body.phone as string | undefined;
+        const safeOrderIds = req.body.orderIds as string[] | undefined;
+
         try {
-          if (Array.isArray(orderIds) && orderIds.length > 0) {
-            await sb.from("order_items").delete().in("order_id", orderIds);
-            await sb.from("orders").delete().in("id", orderIds);
+          if (Array.isArray(safeOrderIds) && safeOrderIds.length > 0) {
+            await sb.from("order_items").delete().in("order_id", safeOrderIds);
+            await sb.from("orders").delete().in("id", safeOrderIds);
           }
-          if (userId) {
-            const { data: userOrders } = await sb.from("orders").select("id").eq("user_id", userId);
+          if (safeUserId) {
+            const { data: userOrders } = await sb.from("orders").select("id").eq("user_id", safeUserId);
             if (userOrders && userOrders.length > 0) {
               const ids = userOrders.map((o: any) => o.id);
               await sb.from("order_items").delete().in("order_id", ids);
             }
-            await sb.from("orders").delete().eq("user_id", userId);
+            await sb.from("orders").delete().eq("user_id", safeUserId);
           }
-          if (email && email.includes("@")) {
-            const cleanEmail = email.trim().toLowerCase();
+          if (safeEmail && safeEmail.includes("@")) {
+            const cleanEmail = safeEmail.trim().toLowerCase();
             await sb.from("orders").delete().or(`customer_email.ilike.${cleanEmail},recipient_email.ilike.${cleanEmail}`);
           }
-          if (phone) {
-            const cleanPhone = phone.replace(/\D/g, "").slice(-10);
+          if (safePhone) {
+            const cleanPhone = safePhone.replace(/\D/g, "").slice(-10);
             if (cleanPhone) {
               await sb
                 .from("orders")
