@@ -1157,9 +1157,15 @@ export async function deleteFirestoreOrder(orderId: string): Promise<boolean> {
 
   // 3. Call Server Backend API to delete with elevated DB permissions
   try {
+    const { data: { session } } = await supabase.auth.getSession();
+    const headers: Record<string, string> = { 'Cache-Control': 'no-cache' };
+    if (session?.access_token) {
+      headers['Authorization'] = `Bearer ${session.access_token}`;
+    }
+
     fetch(`/api/orders/${encodeURIComponent(orderId)}`, {
       method: 'DELETE',
-      headers: { 'Cache-Control': 'no-cache' }
+      headers
     }).catch((apiErr) => console.warn('Server order delete API notice:', apiErr));
   } catch (err) {
     console.warn('Server delete call notice:', err);
@@ -1226,14 +1232,25 @@ export async function clearAllUserOrders(): Promise<boolean> {
       if (user?.email) queryParams.set('email', user.email);
       if (user?.phone) queryParams.set('phone', user.phone);
 
+      const { data: { session } } = await supabase.auth.getSession();
+      const headers: Record<string, string> = { 'Cache-Control': 'no-cache' };
+      if (session?.access_token) {
+        headers['Authorization'] = `Bearer ${session.access_token}`;
+      }
+
       fetch(`/api/orders?${queryParams.toString()}`, {
         method: 'DELETE',
-        headers: { 'Cache-Control': 'no-cache' }
+        headers
       }).catch(() => {
         // Fallback POST
+        const postHeaders: Record<string, string> = { 'Content-Type': 'application/json' };
+        if (session?.access_token) {
+          postHeaders['Authorization'] = `Bearer ${session.access_token}`;
+        }
+
         fetch('/api/orders/clear', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: postHeaders,
           body: JSON.stringify({
             userId,
             email: user?.email,

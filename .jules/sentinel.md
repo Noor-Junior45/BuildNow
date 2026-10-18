@@ -1,0 +1,4 @@
+## 2024-05-18 - [Fix IDOR in Backend Deletion APIs]
+**Vulnerability:** Missing authorization in the backend APIs `DELETE /api/orders/:id`, `DELETE /api/orders`, and `POST /api/orders/clear`. The backend client bypasses RLS, so unauthenticated requests could delete arbitrary orders or clear order histories for victims.
+**Learning:** Even though the frontend relies heavily on RLS when communicating directly with Supabase, any custom backend endpoints acting as proxies or elevated data handlers (using the SERVICE_ROLE key) must fully implement equivalent user authentication and authorization logic. Relying solely on client-side state is a severe risk.
+**Prevention:** Always parse and verify the JWT via `supabase.auth.getUser(token)` on custom backend endpoints and aggressively ensure ownership by securely overriding input payload parameters with the trusted user claims.
