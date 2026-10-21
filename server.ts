@@ -823,6 +823,32 @@ const strictLimiter = rateLimit({
 });
 
 // Middleware that reads process.env.API_SECRET_KEY and checks req.headers['x-api-key']
+
+// Middleware to verify user authentication via Supabase JWT
+async function requireUserAuth(req: express.Request, res: express.Response, next: express.NextFunction) {
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    return res.status(401).json({ success: false, message: "Unauthorized: Missing or invalid token" });
+  }
+
+  const token = authHeader.split(" ")[1];
+  const sb = getServerSupabase();
+  if (!sb) {
+    return res.status(500).json({ success: false, message: "Server configuration error" });
+  }
+
+  try {
+    const { data: { user }, error } = await sb.auth.getUser(token);
+    if (error || !user) {
+      return res.status(401).json({ success: false, message: "Unauthorized: Invalid token" });
+    }
+    (req as any).user = user;
+    next();
+  } catch (err) {
+    return res.status(401).json({ success: false, message: "Unauthorized: Token verification failed" });
+  }
+}
+
 function requireApiSecret(req: express.Request, res: express.Response, next: express.NextFunction) {
   const secret = process.env.API_SECRET_KEY;
   if (!secret) {
@@ -1271,7 +1297,7 @@ async function startServer() {
   });
 
   // Delete specific order from Supabase and Server Caches
-  app.delete("/api/orders/:id", async (req, res) => {
+  app.delete("/api/orders/:id", requireUserAuth, async (req, res) => {
     res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
     try {
       const orderId = req.params.id;
@@ -1282,6 +1308,18 @@ async function startServer() {
       const sb = getServerSupabase();
       if (sb) {
         try {
+          const user = (req as any).user;
+          const isAdmin = ADMIN_EMAILS.includes(user.email?.toLowerCase() || "");
+
+          // Verify ownership first
+          const { data: orderData } = await sb.from("orders").select("user_id").eq("id", orderId).single();
+          if (!orderData) {
+            return res.status(404).json({ success: false, message: "Order not found." });
+          }
+          if (orderData.user_id !== user.id && !isAdmin) {
+             return res.status(403).json({ success: false, message: "Forbidden: You don't have permission to delete this order." });
+          }
+
           // Delete child order items first
           await sb.from("order_items").delete().eq("order_id", orderId);
         } catch (itemErr) {
@@ -1321,10 +1359,20 @@ async function startServer() {
   });
 
   // Clear all user orders from Supabase database
-  app.delete("/api/orders", async (req, res) => {
+  app.delete("/api/orders", requireUserAuth, async (req, res) => {
     res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
     try {
-      const { userId, email, phone } = req.query as { userId?: string; email?: string; phone?: string };
+      const user = (req as any).user;
+      const isAdmin = ADMIN_EMAILS.includes(user.email?.toLowerCase() || "");
+      let { userId, email, phone } = req.query as { userId?: string; email?: string; phone?: string };
+
+      if (!isAdmin) {
+        // Force the scope to the authenticated user
+        userId = user.id;
+        email = user.email;
+        // Keep phone from query if they want to clear by phone, but it will be constrained by user_id
+      }
+
       const sb = getServerSupabase();
 
       if (sb && (userId || email || phone)) {
@@ -1339,31 +1387,31 @@ async function startServer() {
           }
           if (email && email.includes("@")) {
             const cleanEmail = email.trim().toLowerCase();
-            const { data: emailOrders } = await sb
-              .from("orders")
-              .select("id")
-              .or(`customer_email.ilike.${cleanEmail},recipient_email.ilike.${cleanEmail}`);
+            let query = sb.from("orders").select("id").or(`customer_email.ilike.${cleanEmail},recipient_email.ilike.${cleanEmail}`);
+            if (!isAdmin) query = query.eq("user_id", user.id);
+            const { data: emailOrders } = await query;
+
             if (emailOrders && emailOrders.length > 0) {
               const ids = emailOrders.map((o: any) => o.id);
               await sb.from("order_items").delete().in("order_id", ids);
             }
-            await sb.from("orders").delete().or(`customer_email.ilike.${cleanEmail},recipient_email.ilike.${cleanEmail}`);
+            let deleteQuery = sb.from("orders").delete().or(`customer_email.ilike.${cleanEmail},recipient_email.ilike.${cleanEmail}`);
+            if (!isAdmin) deleteQuery = deleteQuery.eq("user_id", user.id);
+            await deleteQuery;
           }
           if (phone) {
             const cleanPhone = phone.replace(/\D/g, "").slice(-10);
             if (cleanPhone) {
-              const { data: phoneOrders } = await sb
-                .from("orders")
-                .select("id")
-                .or(`phone.eq.${cleanPhone},phone.eq.+91${cleanPhone},recipient_phone.eq.${cleanPhone},recipient_phone.eq.+91${cleanPhone}`);
+              let query = sb.from("orders").select("id").or(`phone.eq.${cleanPhone},phone.eq.+91${cleanPhone},recipient_phone.eq.${cleanPhone},recipient_phone.eq.+91${cleanPhone}`);
+              if (!isAdmin) query = query.eq("user_id", user.id);
+              const { data: phoneOrders } = await query;
               if (phoneOrders && phoneOrders.length > 0) {
                 const ids = phoneOrders.map((o: any) => o.id);
                 await sb.from("order_items").delete().in("order_id", ids);
               }
-              await sb
-                .from("orders")
-                .delete()
-                .or(`phone.eq.${cleanPhone},phone.eq.+91${cleanPhone},recipient_phone.eq.${cleanPhone},recipient_phone.eq.+91${cleanPhone}`);
+              let deleteQuery = sb.from("orders").delete().or(`phone.eq.${cleanPhone},phone.eq.+91${cleanPhone},recipient_phone.eq.${cleanPhone},recipient_phone.eq.+91${cleanPhone}`);
+              if (!isAdmin) deleteQuery = deleteQuery.eq("user_id", user.id);
+              await deleteQuery;
             }
           }
         } catch (dbErr) {
@@ -1385,17 +1433,36 @@ async function startServer() {
   });
 
   // POST alias for clear orders in case environment restricts DELETE with query params
-  app.post("/api/orders/clear", async (req, res) => {
+  app.post("/api/orders/clear", requireUserAuth, async (req, res) => {
     res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
     try {
-      const { userId, email, phone, orderIds } = req.body || {};
+      const user = (req as any).user;
+      const isAdmin = ADMIN_EMAILS.includes(user.email?.toLowerCase() || "");
+      let { userId, email, phone, orderIds } = req.body || {};
+
+      if (!isAdmin) {
+        // Force the scope to the authenticated user
+        userId = user.id;
+        email = user.email;
+      }
+
       const sb = getServerSupabase();
 
       if (sb) {
         try {
           if (Array.isArray(orderIds) && orderIds.length > 0) {
-            await sb.from("order_items").delete().in("order_id", orderIds);
-            await sb.from("orders").delete().in("id", orderIds);
+            if (isAdmin) {
+                await sb.from("order_items").delete().in("order_id", orderIds);
+                await sb.from("orders").delete().in("id", orderIds);
+            } else {
+                // For non-admins, ensure they only delete their own orders from the given IDs
+                const { data: ownedOrders } = await sb.from("orders").select("id").in("id", orderIds).eq("user_id", user.id);
+                if (ownedOrders && ownedOrders.length > 0) {
+                    const validIds = ownedOrders.map((o: any) => o.id);
+                    await sb.from("order_items").delete().in("order_id", validIds);
+                    await sb.from("orders").delete().in("id", validIds);
+                }
+            }
           }
           if (userId) {
             const { data: userOrders } = await sb.from("orders").select("id").eq("user_id", userId);
@@ -1407,15 +1474,19 @@ async function startServer() {
           }
           if (email && email.includes("@")) {
             const cleanEmail = email.trim().toLowerCase();
-            await sb.from("orders").delete().or(`customer_email.ilike.${cleanEmail},recipient_email.ilike.${cleanEmail}`);
+            let deleteQuery = sb.from("orders").delete().or(`customer_email.ilike.${cleanEmail},recipient_email.ilike.${cleanEmail}`);
+            if (!isAdmin) deleteQuery = deleteQuery.eq("user_id", user.id);
+            await deleteQuery;
           }
           if (phone) {
             const cleanPhone = phone.replace(/\D/g, "").slice(-10);
             if (cleanPhone) {
-              await sb
+              let deleteQuery = sb
                 .from("orders")
                 .delete()
                 .or(`phone.eq.${cleanPhone},phone.eq.+91${cleanPhone},recipient_phone.eq.${cleanPhone},recipient_phone.eq.+91${cleanPhone}`);
+              if (!isAdmin) deleteQuery = deleteQuery.eq("user_id", user.id);
+              await deleteQuery;
             }
           }
         } catch (dbErr) {
